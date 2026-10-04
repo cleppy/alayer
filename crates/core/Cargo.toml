@@ -1,0 +1,15 @@
+[package]
+name = "layer-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+layer-engine-api = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rusqlite = { workspace = true }
