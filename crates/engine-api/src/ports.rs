@@ -1,4 +1,6 @@
+use crate::budget::ByteBudget;
 use crate::types::{EngineError, EngineEvent, FailureReason, HttpTaskSpec, Progress, TaskId, TaskKind, TaskState};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -59,6 +61,8 @@ pub trait EventSink: Send + Sync {
 /// - Engine durum saklamaz; resume bilgisi `spec.resume` ile gelir, segment
 ///   ilerlemesi `EngineEvent::SegmentPlan/SegmentUpdate` ile dışarı verilir.
 /// - Kalıcılık engine'in işi DEĞİLDİR — tek doğruluk kaynağı core'un DB'si.
+/// - `global_limit` tüm görevlerin paylaştığı hız tavanıdır. `None` = sınırsız.
+///   Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
 #[async_trait::async_trait]
 pub trait HttpEngine: Send + Sync {
     async fn run(
@@ -66,5 +70,6 @@ pub trait HttpEngine: Send + Sync {
         spec: HttpTaskSpec,
         events: mpsc::UnboundedSender<EngineEvent>,
         cancel: CancellationToken,
+        global_limit: Option<Arc<ByteBudget>>,
     ) -> Result<(), EngineError>;
 }

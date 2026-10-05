@@ -4,8 +4,8 @@ use crate::intake::classify_url;
 use crate::queue::QueuePolicy;
 use crate::task::Task;
 use layer_engine_api::{
-    CoreEvent, EngineEvent, EventSink, FailureReason, HttpEngine, HttpTaskSpec, IntakeSource,
-    ResumeState, TaskId, TaskKind, TaskState,
+    ByteBudget, CoreEvent, EngineEvent, EventSink, FailureReason, HttpEngine, HttpTaskSpec,
+    IntakeSource, ResumeState, TaskId, TaskKind, TaskState,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -27,6 +27,9 @@ struct Inner {
     running: Mutex<HashMap<TaskId, CancellationToken>>,
     /// Kuyrukta değişiklik olduğunda pump'ı uyandırır (notify_one: permit birikir).
     notify: Arc<Notify>,
+    /// Tüm görevlerin paylaştığı hız tavanı. `None` = sınırsız.
+    /// Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
+    global_limit: Mutex<Option<Arc<ByteBudget>>>,
     shutdown: CancellationToken,
     pump: Mutex<Option<tokio::task::AbortHandle>>,
     dispatched: AtomicUsize,
@@ -125,8 +128,9 @@ impl Inner {
         let engine = self.http.clone();
         let run_cancel = cancel.clone();
         let run_id = id.clone();
+        let global = self.global_limit.lock().unwrap_or_else(|e| e.into_inner()).clone();
         tokio::spawn(async move {
-            if let Err(e) = engine.run(spec, tx.clone(), run_cancel).await {
+            if let Err(e) = engine.run(spec, tx.clone(), run_cancel, global).await {
                 tracing::error!(task = %run_id, "engine hatası: {e}");
                 let _ = tx.send(EngineEvent::Failed(FailureReason::Io(e.to_string())));
             }
@@ -298,11 +302,20 @@ impl TaskManager {
                 policy,
                 running: Mutex::new(HashMap::new()),
                 notify: Arc::new(Notify::new()),
+                global_limit: Mutex::new(None),
                 shutdown: CancellationToken::new(),
                 pump: Mutex::new(None),
                 dispatched: AtomicUsize::new(0),
             }),
         }
+    }
+
+    /// Tüm görevlerin paylaştığı hız tavanı. `None` kaldırır.
+    /// Çalışan görev bir sonraki chunk'ta yeni bütçeyi görmez — limit
+    /// dispatch anında kopyalanır; canlı güncelleme M2 ayarlar UI'ı ile.
+    pub fn set_global_limit(&self, bps: Option<u64>) {
+        let budget = bps.filter(|n| *n > 0).map(|n| Arc::new(ByteBudget::new(n)));
+        *self.inner.global_limit.lock().unwrap_or_else(|e| e.into_inner()) = budget;
     }
 
     /// Çökme kurtarması (Downloading → Paused) + pump'ı başlatır. Idempotent.
@@ -569,6 +582,7 @@ mod tests {
             spec: HttpTaskSpec,
             events: mpsc::UnboundedSender<EngineEvent>,
             cancel: CancellationToken,
+            _global_limit: Option<Arc<layer_engine_api::ByteBudget>>,
         ) -> Result<(), EngineError> {
             self.calls.lock().unwrap().push(spec);
             for ev in &self.events {
@@ -951,6 +965,7 @@ mod tests {
                 _spec: HttpTaskSpec,
                 _events: mpsc::UnboundedSender<EngineEvent>,
                 _cancel: CancellationToken,
+                _global_limit: Option<Arc<layer_engine_api::ByteBudget>>,
             ) -> Result<(), EngineError> {
                 Err(EngineError::InvalidSpec("bozuk".into()))
             }
