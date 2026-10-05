@@ -10,6 +10,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 
+pub struct Tools {
+    pub ytdlp: Option<PathBuf>,
+    pub node: Option<PathBuf>,
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -49,11 +54,17 @@ pub fn run() {
                     eprintln!("start: {e}");
                 }
             });
+            app.manage(Tools {
+                ytdlp: find_sidecar("yt-dlp.exe"),
+                node: find_node(),
+            });
             app.manage(manager);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_tasks,
+            commands::prepare_download,
+            commands::add_media,
             commands::add_url,
             commands::add_torrent,
             commands::pause,

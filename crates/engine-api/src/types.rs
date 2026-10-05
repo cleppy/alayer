@@ -113,6 +113,9 @@ pub struct ResolverContext {
     pub extractor: String,
     pub format_id: String,
     pub expected_size: Option<u64>,
+    /// `Some("mp3")` ise çözücü sesi ayıklar. Eski kayıtlarda yok.
+    #[serde(default)]
+    pub audio_format: Option<String>,
 }
 
 /// Engine → core olay akışı (`run()` başına bir mpsc kanalı).
@@ -242,6 +245,7 @@ mod tests {
             extractor: "youtube".into(),
             format_id: "137".into(),
             expected_size: Some(1234),
+            audio_format: None,
         };
         let j = serde_json::to_string(&rc).unwrap();
         let back: ResolverContext = serde_json::from_str(&j).unwrap();

@@ -300,6 +300,7 @@ mod tests {
             extractor: "youtube".into(),
             format_id: "137".into(),
             expected_size: Some(1000),
+            audio_format: None,
         });
         t
     }

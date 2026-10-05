@@ -5,7 +5,7 @@ use crate::queue::QueuePolicy;
 use crate::task::Task;
 use layer_engine_api::{
     ByteBudget, CoreEvent, EngineEvent, EventSink, FailureReason, HttpEngine, HttpTaskSpec,
-    IntakeSource, ResumeState, TaskId, TaskKind, TaskState,
+    IntakeSource, ResolverContext, ResumeState, TaskId, TaskKind, TaskState,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -168,6 +168,8 @@ impl Inner {
             task_id: t.id.clone(),
             url: t.url.clone(),
             dest_dir: t.dest_dir.clone(),
+            format: t.resolver_ctx.as_ref().map(|c| c.format_id.clone()),
+            audio_format: t.resolver_ctx.as_ref().and_then(|c| c.audio_format.clone()),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
@@ -498,6 +500,45 @@ impl TaskManager {
             task_id: task.id.clone(),
             kind,
             source,
+        });
+        self.inner.notify.notify_one();
+        Ok(task.id)
+    }
+
+    /// Sayfa linki, kullanıcı kalite seçtikten sonra. `format` yt-dlp `-f` değeridir.
+    pub async fn intake_media(
+        &self,
+        url: String,
+        dest_dir: PathBuf,
+        title: String,
+        format: String,
+        audio_format: Option<String>,
+    ) -> Result<TaskId, CoreError> {
+        let mut task = Task::new_media(url.clone(), dest_dir);
+        let cleaned: String = title
+            .chars()
+            .map(|c| match c {
+                '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+                c if (c as u32) < 0x20 => '_',
+                c => c,
+            })
+            .collect();
+        let cleaned = cleaned.trim().trim_matches('.').to_string();
+        if !cleaned.is_empty() {
+            task.file_name = cleaned.chars().take(80).collect();
+        }
+        task.resolver_ctx = Some(ResolverContext {
+            original_url: url,
+            extractor: "ytdlp".into(),
+            format_id: format,
+            expected_size: None,
+            audio_format,
+        });
+        self.inner.db.upsert_task(&task)?;
+        self.inner.emit(CoreEvent::TaskAdded {
+            task_id: task.id.clone(),
+            kind: TaskKind::Media,
+            source: IntakeSource::Ui,
         });
         self.inner.notify.notify_one();
         Ok(task.id)

@@ -4,14 +4,17 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import Strip from "./lib/Strip.svelte";
   import {
+    addMedia,
     addTorrent,
     addUrl,
     cancel,
     inApp,
     listTasks,
     pause,
+    prepareDownload,
     resume,
     subscribe,
+    type FormatChoice,
     type TaskView,
     type UiEvent,
   } from "./lib/api";
@@ -22,6 +25,13 @@
   let error = $state("");
   let busy = $state(false);
   let dragging = $state(false);
+  let looking = $state(false);
+  let pendingUrl = $state("");
+  let menuTitle = $state("");
+  let choices = $state<FormatChoice[]>([]);
+
+  const videos = $derived(choices.filter((c) => c.group === "video"));
+  const audios = $derived(choices.filter((c) => c.group === "audio"));
 
   async function refresh() {
     const next = await listTasks();
@@ -117,8 +127,18 @@
     const value = url.trim();
     if (!value || busy) return;
     busy = true;
+    looking = true;
+    choices = [];
     error = "";
     try {
+      const prepared = await prepareDownload(value);
+      if (prepared.action === "choose") {
+        pendingUrl = value;
+        menuTitle = prepared.title;
+        choices = prepared.choices;
+        looking = false;
+        return;
+      }
       await addUrl(value);
       url = "";
       await refresh();
@@ -126,6 +146,27 @@
       error = err instanceof Error ? err.message : String(err);
     } finally {
       busy = false;
+      looking = false;
+    }
+  }
+
+  function dismissMenu() {
+    choices = [];
+    pendingUrl = "";
+    menuTitle = "";
+  }
+
+  async function pick(choice: FormatChoice) {
+    const target = pendingUrl;
+    const title = menuTitle || "video";
+    dismissMenu();
+    url = "";
+    error = "";
+    try {
+      await addMedia(target, title, choice.format, choice.audio_format);
+      await refresh();
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
     }
   }
 
@@ -168,6 +209,34 @@
       <button type="button" class="file" onclick={pickTorrent} disabled={!inApp}>Torrent dosyası</button>
     </form>
   </header>
+
+  {#if looking}
+    <p class="empty">Formatlar bakılıyor…</p>
+  {/if}
+  {#if choices.length > 0}
+    <section class="deck" aria-label="Kalite">
+      <div class="deck-head">
+        <h2>{menuTitle}</h2>
+        <button type="button" class="quiet" onclick={dismissMenu}>Vazgeç</button>
+      </div>
+      {#if videos.length > 0}
+        <p class="deck-label">Görüntü · mp4</p>
+        <div class="keys">
+          {#each videos as choice (choice.id)}
+            <button type="button" class="key" onclick={() => pick(choice)}>{choice.label}</button>
+          {/each}
+        </div>
+      {/if}
+      {#if audios.length > 0}
+        <p class="deck-label">Ses</p>
+        <div class="keys">
+          {#each audios as choice (choice.id)}
+            <button type="button" class="key audio" onclick={() => pick(choice)}>{choice.label}</button>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   {#if error}
     <p class="banner" role="alert">{error}</p>

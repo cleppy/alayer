@@ -8,6 +8,8 @@
     "core:event:allow-listen",
     "dialog:default",
     "allow-list-tasks",
+    "allow-prepare-download",
+    "allow-add-media",
     "allow-add-url",
     "allow-add-torrent",
     "allow-pause",

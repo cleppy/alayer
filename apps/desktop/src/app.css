@@ -75,6 +75,39 @@ form button[type="submit"] {
 }
 form .file { border-color: var(--chip); color: var(--ink); }
 
+.deck {
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 0.9rem 1rem;
+  background: var(--panel);
+}
+.deck-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.deck-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-label {
+  margin: 0.75rem 0 0.35rem;
+  color: var(--dim);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+.keys { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.key {
+  min-width: 4.2rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--bench);
+  color: var(--leader);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+.key.audio { color: var(--ink); font-size: 1rem; }
+.deck .quiet { color: var(--dim); padding: 0.2rem 0.4rem; }
+
 .banner { color: var(--fail); margin: 0 0 0.8rem; }
 .empty { color: var(--dim); margin: 0 0 1rem; }
 .queue { display: flex; flex-direction: column; gap: 0.55rem; }

@@ -4,6 +4,16 @@ description = "Kuyruğu listeler."
 commands.allow = ["list_tasks"]
 
 [[permission]]
+identifier = "allow-prepare-download"
+description = "Sayfa linkinin kalite listesini çıkarır."
+commands.allow = ["prepare_download"]
+
+[[permission]]
+identifier = "allow-add-media"
+description = "Seçilen kaliteyle medya ekler."
+commands.allow = ["add_media"]
+
+[[permission]]
 identifier = "allow-add-url"
 description = "Linkten görev ekler."
 commands.allow = ["add_url"]

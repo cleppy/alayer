@@ -72,6 +72,10 @@ pub struct MediaTaskSpec {
     pub task_id: TaskId,
     pub url: String,
     pub dest_dir: std::path::PathBuf,
+    /// yt-dlp `-f`. Yoksa en iyi birleşik dosya.
+    pub format: Option<String>,
+    /// `mp3` ise `--extract-audio`.
+    pub audio_format: Option<String>,
 }
 
 /// Sayfa linkini medyaya çeviren çözücü (yt-dlp bir implementasyondur, core onu tanımaz).

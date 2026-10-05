@@ -6,6 +6,36 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
 
+pub async fn probe_media(
+    program: &std::path::Path,
+    node: Option<&std::path::Path>,
+    url: &str,
+) -> Result<(String, Vec<crate::formats::FormatChoice>), String> {
+    let mut cmd = Command::new(program);
+    cmd.arg("--dump-single-json")
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--no-colors");
+    if let Some(node) = node {
+        cmd.arg("--js-runtimes")
+            .arg(format!("node:{}", node.display()));
+    }
+    cmd.arg(url).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let out = cmd.output().await.map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let line = err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("çözülemedi");
+        return Err(line.to_string());
+    }
+    let info: serde_json::Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
+    let title = crate::formats::title_of(&info);
+    let choices = crate::formats::curate(&info);
+    if choices.is_empty() {
+        return Err("seçilecek format yok".into());
+    }
+    Ok((title, choices))
+}
+
 pub struct YtdlpResolver {
     program: PathBuf,
     ffmpeg_dir: Option<PathBuf>,
@@ -59,14 +89,22 @@ impl MediaResolver for YtdlpResolver {
             cmd.arg("--js-runtimes").arg(runtime);
         }
         if let Some(dir) = &self.ffmpeg_dir {
-            cmd.arg("--ffmpeg-location")
-                .arg(dir)
-                .arg("-f")
-                .arg("bv*+ba/b")
-                .arg("--merge-output-format")
-                .arg("mp4");
+            cmd.arg("--ffmpeg-location").arg(dir);
+        }
+        if let Some(audio) = &spec.audio_format {
+            cmd.arg("-f")
+                .arg(spec.format.as_deref().unwrap_or("ba/b"))
+                .arg("--extract-audio")
+                .arg("--audio-format")
+                .arg(audio);
+        } else if let Some(format) = &spec.format {
+            cmd.arg("-f").arg(format);
+            if self.ffmpeg_dir.is_some() {
+                cmd.arg("--merge-output-format").arg("mp4");
+            }
+        } else if self.ffmpeg_dir.is_some() {
+            cmd.arg("-f").arg("bv*+ba/b").arg("--merge-output-format").arg("mp4");
         } else {
-            // ffmpeg yok: birleşik dosya. YouTube'da bu genelde 360p.
             cmd.arg("-f").arg("b");
         }
         cmd.arg(&spec.url)

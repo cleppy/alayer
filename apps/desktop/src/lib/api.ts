@@ -34,6 +34,31 @@ export function listTasks(): Promise<TaskView[]> {
   return invoke("list_tasks");
 }
 
+export type FormatChoice = {
+  id: string;
+  label: string;
+  group: string;
+  format: string;
+  audio_format: string | null;
+};
+
+export type Prepare =
+  | { action: "direct" }
+  | { action: "choose"; title: string; choices: FormatChoice[] };
+
+export function prepareDownload(url: string): Promise<Prepare> {
+  return invoke("prepare_download", { url });
+}
+
+export function addMedia(
+  url: string,
+  title: string,
+  format: string,
+  audioFormat: string | null,
+): Promise<string> {
+  return invoke("add_media", { url, title, format, audioFormat });
+}
+
 export function addUrl(url: string): Promise<string> {
   return invoke("add_url", { url });
 }
