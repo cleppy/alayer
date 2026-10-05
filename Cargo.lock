@@ -677,6 +677,7 @@ version = "0.1.0"
 name = "layer-core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "layer-engine-api",
  "rusqlite",
  "serde",
@@ -684,6 +685,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]

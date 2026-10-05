@@ -34,6 +34,10 @@ pub enum CoreEvent {
     Conflict {
         task_id: TaskId,
     },
+    /// Görev iptal edildi ve DB'den silindi (.part dosyası da silinir).
+    TaskRemoved {
+        task_id: TaskId,
+    },
     /// Clipboard "sor" modu: yakalanan URL için onay isteği (M5'te kullanılır).
     IntakePrompt {
         url: String,
