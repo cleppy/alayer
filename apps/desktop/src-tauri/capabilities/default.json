@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "ana pencere",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "allow-list-tasks",
+    "allow-add-url",
+    "allow-pause",
+    "allow-resume",
+    "allow-cancel"
+  ]
+}

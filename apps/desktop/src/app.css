@@ -1,0 +1,251 @@
+:root {
+  --bench: #1c2430;
+  --frame: #243044;
+  --unexposed: #2a3444;
+  --exposure: #f3f6fb;
+  --leader: #e6b325;
+  --ink: #e8edf4;
+  --ink-dim: #9aa6b5;
+  --dark: #1a2230;
+  --fail: #e15b52;
+  --sprocket: #0e141c;
+  --hole: #1c2430;
+  --focus: #e6b325;
+  color: var(--ink);
+  background: var(--bench);
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bench);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+}
+
+header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem;
+  align-items: end;
+  margin-bottom: 1.25rem;
+}
+
+.mark {
+  margin: 0;
+  font-family: Syne, sans-serif;
+  font-weight: 700;
+  font-size: 1.7rem;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  background: var(--unexposed);
+  color: var(--ink);
+  border: 1px solid #3c4a5e;
+  border-radius: 2px;
+  padding: 0.55rem 0.7rem;
+}
+
+input::placeholder {
+  color: var(--ink-dim);
+}
+
+form button {
+  background: var(--leader);
+  color: #1a1608;
+  font-weight: 600;
+  border-radius: 2px;
+}
+
+.banner,
+.empty {
+  margin: 0 0 1rem;
+  color: var(--ink-dim);
+}
+
+.banner {
+  color: var(--fail);
+}
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  min-height: 4.6rem;
+  background: var(--bench);
+}
+
+.sprocket {
+  background:
+    radial-gradient(circle at 50% 12px, var(--hole) 4px, transparent 4.5px),
+    radial-gradient(circle at 50% calc(100% - 12px), var(--hole) 4px, transparent 4.5px),
+    var(--sprocket);
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.exposure {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill);
+  background: var(--exposure);
+}
+
+.copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.copy .name,
+.copy .meta,
+.copy .fail {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.meta,
+.fail {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
+
+.light {
+  color: var(--ink);
+}
+
+.light .meta {
+  color: var(--ink-dim);
+}
+
+.dark {
+  position: absolute;
+  inset: 0.75rem 0.85rem auto 0.85rem;
+  color: var(--dark);
+  clip-path: inset(0 calc(100% - var(--fill)) 0 0);
+  pointer-events: none;
+}
+
+.dark .meta,
+.dark .fail {
+  color: #5c4a32;
+}
+
+.fail {
+  color: var(--fail);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-left: 0.65rem;
+  background: var(--bench);
+}
+
+.actions button {
+  color: var(--ink);
+}
+
+.actions .quiet {
+  color: var(--ink-dim);
+}
+
+@media (max-width: 720px) {
+  header,
+  form,
+  .frame {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions {
+    margin-top: 0.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .exposure,
+  .dark {
+    transition: width 180ms linear, clip-path 180ms linear;
+  }
+}

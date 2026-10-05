@@ -477,6 +477,11 @@ impl TaskManager {
     pub fn dispatch_count(&self) -> usize {
         self.inner.dispatched.load(Ordering::SeqCst)
     }
+
+    /// Kuyruk anlık görüntüsü. Kabuk bunu UI DTO'suna çevirir.
+    pub fn list(&self) -> Result<Vec<Task>, CoreError> {
+        Ok(self.inner.db.list_tasks()?)
+    }
 }
 
 #[cfg(test)]

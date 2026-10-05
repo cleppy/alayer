@@ -1,0 +1,24 @@
+[[permission]]
+identifier = "allow-list-tasks"
+description = "Kuyruğu listeler."
+commands.allow = ["list_tasks"]
+
+[[permission]]
+identifier = "allow-add-url"
+description = "Linkten görev ekler."
+commands.allow = ["add_url"]
+
+[[permission]]
+identifier = "allow-pause"
+description = "Görevi duraklatır."
+commands.allow = ["pause"]
+
+[[permission]]
+identifier = "allow-resume"
+description = "Görevi sürdürür."
+commands.allow = ["resume"]
+
+[[permission]]
+identifier = "allow-cancel"
+description = "Görevi iptal eder."
+commands.allow = ["cancel"]

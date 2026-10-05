@@ -1,0 +1,27 @@
+[package]
+name = "layer-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "layer desktop shell"
+
+[lib]
+name = "layer_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "layer-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+layer-core = { workspace = true }
+layer-engine-api = { workspace = true }
+layer-engine-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
