@@ -2,3 +2,7 @@
 //!
 //! Bu crate dış dünyayı (Tauri, aria2, yt-dlp, HTTP istemcileri) TANIMAZ.
 //! Yalnız `layer-engine-api` portları üzerinden konuşur; SQLite tek doğruluk kaynağıdır.
+
+pub mod task;
+
+pub use task::{InvalidTransition, Task};
