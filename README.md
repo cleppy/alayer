@@ -4,7 +4,7 @@ kendi indirme yöneticin: segmented HTTP(S) + torrent + "link yapıştır" medya
 
 ## Durum
 
-- **M1 ✅ (in progress)** — headless çekirdek: `engine-api` (portlar), `core` (durum makinesi + SQLite + kuyruk + TaskManager), `engine-http` (segmented indirme, resume, If-Range conflict, retry)
+- **M1 ✅** — headless çekirdek: `engine-api`, `core` (SQLite + kuyruk + TaskManager), `engine-http` (segmented, resume, If-Range conflict, retry), `layer-cli`
 - M2 — Tauri kabuk + Svelte UI
 - M3 — torrent köprüsü (aria2 sidecar)
 - M4 — medya çözücü (yt-dlp sidecar, ffmpeg mux-only)

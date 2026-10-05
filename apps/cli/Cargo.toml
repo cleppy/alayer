@@ -4,4 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "layer-cli"
+path = "src/main.rs"
+
 [dependencies]
+layer-core = { workspace = true }
+layer-engine-api = { workspace = true }
+layer-engine-http = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
