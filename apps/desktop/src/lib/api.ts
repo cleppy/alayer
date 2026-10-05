@@ -40,6 +40,7 @@ export type FormatChoice = {
   group: string;
   format: string;
   audio_format: string | null;
+  bytes: number | null;
 };
 
 export type Prepare =
@@ -55,8 +56,13 @@ export function addMedia(
   title: string,
   format: string,
   audioFormat: string | null,
+  expectedBytes: number | null,
 ): Promise<string> {
-  return invoke("add_media", { url, title, format, audioFormat });
+  return invoke("add_media", { url, title, format, audioFormat, expectedBytes });
+}
+
+export function openDownloads(): Promise<void> {
+  return invoke("open_downloads");
 }
 
 export function addUrl(url: string): Promise<string> {

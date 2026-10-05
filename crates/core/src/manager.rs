@@ -525,6 +525,7 @@ impl TaskManager {
         title: String,
         format: String,
         audio_format: Option<String>,
+        expected_bytes: Option<u64>,
     ) -> Result<TaskId, CoreError> {
         let mut task = Task::new_media(url.clone(), dest_dir);
         let cleaned: String = title
@@ -543,9 +544,10 @@ impl TaskManager {
             original_url: url,
             extractor: "ytdlp".into(),
             format_id: format,
-            expected_size: None,
+            expected_size: expected_bytes,
             audio_format,
         });
+        task.total_bytes = expected_bytes.filter(|n| *n > 0);
         self.inner.db.upsert_task(&task)?;
         self.inner.emit(CoreEvent::TaskAdded {
             task_id: task.id.clone(),

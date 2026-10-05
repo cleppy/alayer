@@ -109,3 +109,112 @@ $ vite
 [2m08:41:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
 [1m[96m    Building[0m [=======================> ] 443/444: layer-d…                                                            [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 12.95s
 [1m[92m     Running[0m `A:\copeiums\layer\target\debug\layer-desktop.exe`
+[2m08:42:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m08:42:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:42:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+        Info File A:\copeiums\layer\crates\engine-bridge\src\formats.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `video_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:41:24
+   [1m[96m|[0m
+[1m[96m41[0m [1m[96m|[0m                 bytes: video_bytes(formats, h),
+   [1m[96m|[0m                        [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `video_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:52:20
+   [1m[96m|[0m
+[1m[96m52[0m [1m[96m|[0m             bytes: video_bytes(formats, u64::MAX),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `audio_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:63:20
+   [1m[96m|[0m
+[1m[96m63[0m [1m[96m|[0m             bytes: audio_bytes(formats),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `audio_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:71:20
+   [1m[96m|[0m
+[1m[96m71[0m [1m[96m|[0m             bytes: audio_bytes(formats),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[97mFor more information about this error, try `rustc --explain E0425`.[0m
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[0m: could not compile `layer-engine-bridge` (lib) due to 4 previous errors
+        Info File A:\copeiums\layer\crates\engine-bridge\src\formats.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `video_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:41:24
+   [1m[96m|[0m
+[1m[96m41[0m [1m[96m|[0m                 bytes: video_bytes(formats, h),
+   [1m[96m|[0m                        [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `video_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:52:20
+   [1m[96m|[0m
+[1m[96m52[0m [1m[96m|[0m             bytes: video_bytes(formats, u64::MAX),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `audio_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:63:20
+   [1m[96m|[0m
+[1m[96m63[0m [1m[96m|[0m             bytes: audio_bytes(formats),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[E0425][0m[1m[97m: cannot find function `audio_bytes` in this scope[0m
+  [1m[96m--> [0mcrates\engine-bridge\src\formats.rs:71:20
+   [1m[96m|[0m
+[1m[96m71[0m [1m[96m|[0m             bytes: audio_bytes(formats),
+   [1m[96m|[0m                    [1m[91m^^^^^^^^^^^[0m [1m[91mnot found in this scope[0m
+
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[97mFor more information about this error, try `rustc --explain E0425`.[0m
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[91merror[0m: could not compile `layer-engine-bridge` (lib) due to 4 previous errors
+        Info File A:\copeiums\layer\crates\engine-bridge\src\formats.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 442/444: layer-d…        Info File A:\copeiums\layer\crates\engine-bridge\src\formats.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 442/444: layer-d…[1m[96m    Building[0m [=======================> ] 443/444: layer-d…                                                            [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 12.22s
+[1m[92m     Running[0m `A:\copeiums\layer\target\debug\layer-desktop.exe`
+        Info File src-tauri\src\commands.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info File src-tauri\src\lib.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-d…        Info File src-tauri\permissions\commands.toml changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info File src-tauri\capabilities\default.json changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-core v0.1.0 (A:\copeiums\layer\crates\core)
+[1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 440/444: layer-c…        Info File A:\copeiums\layer\crates\core\src\manager.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-core v0.1.0 (A:\copeiums\layer\crates\core)
+[1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 440/444: layer-c…[1m[96m    Building[0m [=======================> ] 441/444: layer-d…[1m[96m    Building[0m [=======================> ] 442/444: layer-d…[1m[96m    Building[0m [=======================> ] 443/444: layer-d…        Info File A:\copeiums\layer\crates\engine-bridge\src\progress.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…[2m08:47:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:47:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+        Info File A:\copeiums\layer\crates\engine-bridge\src\ytdlp.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[2m08:47:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
+[1m[96m    Building[0m [=======================> ] 441/444: layer-e…[2m08:47:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+                                                            [1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
+[1m[96m    Building[0m [=======================> ] 442/444: layer-d…[2m08:47:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:47:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m08:47:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m08:47:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/Strip.svelte[22m
+[1m[96m    Building[0m [=======================> ] 443/444: layer-d…                                                            [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 8.86s
+[1m[92m     Running[0m `A:\copeiums\layer\target\debug\layer-desktop.exe`
+        Info File src-tauri\src\commands.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m    Blocking[0m waiting for file lock on package cache
+        Info File A:\copeiums\layer\crates\engine-bridge\src\progress.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m    Blocking[0m waiting for file lock on build directory

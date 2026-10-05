@@ -24,6 +24,11 @@ description = "Torrent dosyası ekler."
 commands.allow = ["add_torrent"]
 
 [[permission]]
+identifier = "allow-open-downloads"
+description = "Opens the download folder."
+commands.allow = ["open_downloads"]
+
+[[permission]]
 identifier = "allow-pause"
 description = "Görevi duraklatır."
 commands.allow = ["pause"]

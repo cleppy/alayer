@@ -28,6 +28,48 @@ pub fn parse_progress(line: &str) -> Option<Progress> {
     })
 }
 
+/// `[download] 10.3% of 45.67MiB at 8.70MiB/s`
+pub fn parse_human(line: &str) -> Option<Progress> {
+    let lower = line.to_ascii_lowercase();
+    let of = lower.find(" of ")?;
+    let at = lower[of + 4..].find(" at ").map(|i| of + 4 + i);
+    let size_src = match at {
+        Some(end) => &line[of + 4..end],
+        None => return None,
+    };
+    let total = parse_size(size_src.trim())?;
+    let pct = line[..of]
+        .split_whitespace()
+        .last()
+        .and_then(|s| s.trim_end_matches('%').parse::<f64>().ok())
+        .unwrap_or(0.0);
+    let downloaded = ((pct / 100.0) * total as f64) as u64;
+    let speed = at
+        .and_then(|i| line[i + 4..].split_whitespace().next())
+        .and_then(parse_size)
+        .unwrap_or(0) as f64;
+    Some(Progress {
+        downloaded_bytes: downloaded,
+        total_bytes: Some(total),
+        speed_bps: speed,
+    })
+}
+
+fn parse_size(raw: &str) -> Option<u64> {
+    let raw = raw.trim();
+    let split = raw.find(|c: char| c.is_ascii_alphabetic())?;
+    let num: f64 = raw[..split].trim().parse().ok()?;
+    let unit = raw[split..].trim().to_ascii_lowercase();
+    let mul = match unit.as_str() {
+        "b" => 1.0,
+        "kib" | "kb" => 1024.0,
+        "mib" | "mb" => 1024.0 * 1024.0,
+        "gib" | "gb" => 1024.0 * 1024.0 * 1024.0,
+        _ => return None,
+    };
+    Some((num * mul) as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,6 +89,13 @@ mod tests {
         let p = parse_progress("1024|5098855|394286.9").unwrap();
         assert_eq!(p.downloaded_bytes, 1024);
         assert_eq!(p.total_bytes, Some(5_098_855));
+    }
+
+    #[test]
+    fn parses_human_mib_line() {
+        let p = parse_human("[download] 10.0% of 10.00MiB at 1.00MiB/s").unwrap();
+        assert_eq!(p.total_bytes, Some(10 * 1024 * 1024));
+        assert!(p.downloaded_bytes > 0);
     }
 
     #[test]

@@ -30,6 +30,7 @@ pub struct ChoiceView {
     pub group: String,
     pub format: String,
     pub audio_format: Option<String>,
+    pub bytes: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -50,7 +51,7 @@ pub async fn prepare_download(tools: State<'_, Tools>, url: String) -> Result<Pr
             let ytdlp = tools
                 .ytdlp
                 .as_ref()
-                .ok_or("yt-dlp yok, kalite seçilemez")?;
+                .ok_or("yt-dlp is missing")?;
             let (title, choices) = probe_media(ytdlp, tools.node.as_deref(), &url).await?;
             Ok(Prepare::Choose {
                 title,
@@ -62,6 +63,7 @@ pub async fn prepare_download(tools: State<'_, Tools>, url: String) -> Result<Pr
                         group: c.group,
                         format: c.format,
                         audio_format: c.audio_format,
+                        bytes: c.bytes,
                     })
                     .collect(),
             })
@@ -79,10 +81,11 @@ pub async fn add_media(
     title: String,
     format: String,
     audio_format: Option<String>,
+    expected_bytes: Option<u64>,
 ) -> Result<String, String> {
     let dir = downloads(&app)?;
     state
-        .intake_media(url, dir, title, format, audio_format)
+        .intake_media(url, dir, title, format, audio_format, expected_bytes)
         .await
         .map_err(|e| e.to_string())
 }
@@ -111,6 +114,16 @@ pub async fn add_torrent(
         .intake_torrent_file(std::path::PathBuf::from(path), dir)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn open_downloads(app: AppHandle) -> Result<(), String> {
+    let dir = downloads(&app)?;
+    std::process::Command::new("explorer")
+        .arg(dir)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]

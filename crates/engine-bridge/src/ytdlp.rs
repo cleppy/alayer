@@ -1,4 +1,4 @@
-use crate::progress::parse_progress;
+use crate::progress::{parse_human, parse_progress};
 use layer_engine_api::{EngineError, EngineEvent, FailureReason, MediaResolver, MediaTaskSpec};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -122,7 +122,7 @@ impl MediaResolver for YtdlpResolver {
             let mut lines = BufReader::new(stderr).lines();
             let mut kept = String::new();
             while let Ok(Some(line)) = lines.next_line().await {
-                if let Some(progress) = parse_progress(&line) {
+                if let Some(progress) = parse_progress(&line).or_else(|| parse_human(&line)) {
                     let _ = events_err.send(EngineEvent::Progress(progress));
                 }
                 if kept.len() < 4000 {
@@ -159,7 +159,7 @@ impl MediaResolver for YtdlpResolver {
             if let Some(stdout) = stdout {
                 let mut lines = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    if let Some(progress) = parse_progress(&line) {
+                    if let Some(progress) = parse_progress(&line).or_else(|| parse_human(&line)) {
                         let _ = events.send(EngineEvent::Progress(progress));
                     }
                 }

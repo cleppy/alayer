@@ -66,6 +66,7 @@ pub fn run() {
             commands::prepare_download,
             commands::add_media,
             commands::add_url,
+            commands::open_downloads,
             commands::add_torrent,
             commands::pause,
             commands::resume,

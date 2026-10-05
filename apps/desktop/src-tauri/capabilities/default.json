@@ -11,6 +11,7 @@
     "allow-prepare-download",
     "allow-add-media",
     "allow-add-url",
+    "allow-open-downloads",
     "allow-add-torrent",
     "allow-pause",
     "allow-resume",

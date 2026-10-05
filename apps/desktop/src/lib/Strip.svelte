@@ -59,9 +59,9 @@
       <span class="dim">{speed(rate)}</span>
     {/if}
   </p>
-  <div class="cubes" aria-hidden="true">
+  <div class="cubes" class:live={task.state === "downloading"} aria-hidden="true">
     {#each Array(count) as _, i (i)}
-      <span class="cube" class:on={i < filled} class:now={active && i === filled}></span>
+      <span class="cube" class:on={i < filled} style="--i: {i}"></span>
     {/each}
   </div>
   <p class="meta">{stateLabel(task.state)}{#if task.failure} · {task.failure}{/if}</p>

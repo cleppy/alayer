@@ -280,12 +280,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border: 1px solid #6a6a6a;
 }
 .cube.on { background: var(--accent); border-color: var(--accent); }
-.cube.now { animation: cube-pulse 0.9s ease-in-out infinite; }
-@keyframes cube-pulse {
-  50% { background: var(--accent); border-color: var(--accent); opacity: 0.55; }
+.cubes.live .cube:not(.on) {
+  animation: cube-wave 1s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 90ms);
+}
+@keyframes cube-wave {
+  0%, 100% { transform: translateY(0); background: #3a3a3a; }
+  45% { transform: translateY(-5px); background: var(--accent); border-color: var(--accent); }
 }
 
-.settings { position: relative; }
+.settings { position: relative; display: flex; gap: 0.35rem; }
 .gear {
   padding: 0.4rem 0.7rem;
   font-weight: 700;

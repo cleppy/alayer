@@ -7,6 +7,7 @@
     addMedia,
     addTorrent,
     addUrl,
+    openDownloads,
     cancel,
     inApp,
     listTasks,
@@ -190,7 +191,7 @@
     url = "";
     error = "";
     try {
-      await addMedia(target, title, choice.format, choice.audio_format);
+      await addMedia(target, title, choice.format, choice.audio_format, choice.bytes);
       await refresh();
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -220,6 +221,7 @@
   <header class="top">
     <p class="mark">layer</p>
     <div class="settings">
+      <button type="button" class="gear" title="Open downloads" onclick={() => openDownloads().catch((err) => (error = String(err)))}>Files</button>
       <button type="button" class="gear" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
       {#if settingsOpen}
         <div class="panel">
