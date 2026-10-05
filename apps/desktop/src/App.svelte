@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open } from "@tauri-apps/plugin-dialog";
+  import Detail from "./lib/Detail.svelte";
   import Strip from "./lib/Strip.svelte";
   import {
     addMedia,
@@ -32,6 +33,26 @@
 
   const videos = $derived(choices.filter((c) => c.group === "video"));
   const audios = $derived(choices.filter((c) => c.group === "audio"));
+  let version = $state<"split" | "plain">(
+    localStorage.getItem("layer-ui") === "plain" ? "plain" : "split",
+  );
+  let filter = $state("all");
+  let selectedId = $state("");
+
+  const shown = $derived(
+    tasks.filter((task) => {
+      if (filter === "video") return task.kind === "media";
+      if (filter === "torrent") return task.kind === "torrent";
+      if (filter === "file") return task.kind === "http";
+      return true;
+    }),
+  );
+  const selected = $derived(shown.find((task) => task.id === selectedId) ?? shown[0]);
+
+  function setVersion(next: "split" | "plain") {
+    version = next;
+    localStorage.setItem("layer-ui", next);
+  }
 
   async function refresh() {
     const next = await listTasks();
@@ -189,26 +210,33 @@
   }
 </script>
 
-<main class:dragging>
-  <header>
-    <div class="brand">
-      <p class="mark">layer</p>
-      <p class="lede">Link, magnet veya torrent.</p>
+<main class="shell" class:dragging>
+  <header class="top">
+    <p class="mark">layer</p>
+    <div class="versions" aria-label="Görünüm">
+      <button type="button" class:on={version === "split"} onclick={() => setVersion("split")}>1 Bölünmüş</button>
+      <button type="button" class:on={version === "plain"} onclick={() => setVersion("plain")}>2 Sade</button>
     </div>
-    <form onsubmit={submit}>
-      <label class="sr" for="url">İndirme linki veya magnet</label>
-      <input
-        id="url"
-        bind:value={url}
-        placeholder="https://…  veya  magnet:?xt=…"
-        autocomplete="off"
-        spellcheck="false"
-        disabled={!inApp || busy}
-      />
-      <button type="submit" disabled={!inApp || busy || url.trim() === ""}>İndir</button>
-      <button type="button" class="file" onclick={pickTorrent} disabled={!inApp}>Torrent dosyası</button>
-    </form>
   </header>
+  <form class="composer" onsubmit={submit}>
+    <label class="sr" for="url">İndirme linki veya magnet</label>
+    <input
+      id="url"
+      bind:value={url}
+      placeholder="https://…  veya  magnet:?xt=…"
+      autocomplete="off"
+      spellcheck="false"
+      disabled={!inApp || busy}
+    />
+    <button class="go" type="submit" disabled={!inApp || busy || url.trim() === ""}>İndir</button>
+    <button class="file" type="button" onclick={pickTorrent} disabled={!inApp}>Torrent</button>
+  </form>
+  <div class="filters" aria-label="Süzgeç">
+    <button type="button" class:on={filter === "all"} onclick={() => (filter = "all")}>Tümü</button>
+    <button type="button" class:on={filter === "video"} onclick={() => (filter = "video")}>Video</button>
+    <button type="button" class:on={filter === "torrent"} onclick={() => (filter = "torrent")}>Torrent</button>
+    <button type="button" class:on={filter === "file"} onclick={() => (filter = "file")}>Dosya</button>
+  </div>
 
   {#if looking}
     <p class="empty">Formatlar bakılıyor…</p>
@@ -247,17 +275,30 @@
     <p class="empty">Kuyruk boş. Link yapıştır, magnet yapıştır, ya da bir .torrent bırak.</p>
   {/if}
 
-  <section class="queue" aria-label="İndirme kuyruğu">
-    {#each tasks as task (task.id)}
-      <Strip
-        {task}
-        rate={rates[task.id] ?? 0}
+  <div class="layout" class:plain={version === "plain"}>
+    <section class="list" aria-label="İndirme kuyruğu">
+      {#each shown as task (task.id)}
+        <Strip
+          {task}
+          rate={rates[task.id] ?? 0}
+          selected={selected?.id === task.id}
+          onOpen={(id) => (selectedId = id)}
+          onPause={(id) => run(pause, id)}
+          onResume={(id) => run(resume, id)}
+          onCancel={(id) => run(cancel, id)}
+        />
+      {/each}
+    </section>
+    {#if version === "split" && selected}
+      <Detail
+        task={selected}
+        rate={rates[selected.id] ?? 0}
         onPause={(id) => run(pause, id)}
         onResume={(id) => run(resume, id)}
         onCancel={(id) => run(cancel, id)}
       />
-    {/each}
-  </section>
+    {/if}
+  </div>
 
   {#if dragging}
     <div class="drop">Torrent dosyasını bırak</div>

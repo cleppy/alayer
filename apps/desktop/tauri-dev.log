@@ -31,4 +31,12 @@ $ vite
      Running DevCommand (`cargo  run --no-default-features --color always --`)
 [1m[92m   Compiling[0m layer-engine-bridge v0.1.0 (A:\copeiums\layer\crates\engine-bridge)
 [1m[96m    Building[0m [=======================> ] 441/444: layer-e…                                                            [1m[92m   Compiling[0m layer-desktop v0.1.0 (A:\copeiums\layer\apps\desktop\src-tauri)
-[1m[96m    Building[0m [=======================> ] 442/444: layer-d…
+[1m[96m    Building[0m [=======================> ] 442/444: layer-d…[1m[96m    Building[0m [=======================> ] 443/444: layer-d…                                                            [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 15.84s
+[1m[92m     Running[0m `A:\copeiums\layer\target\debug\layer-desktop.exe`
+[2m08:24:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m08:24:12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/Strip.svelte[22m
+[2m08:24:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m08:24:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:24:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:24:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m
+[2m08:24:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte[22m

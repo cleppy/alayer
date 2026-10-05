@@ -1,36 +1,33 @@
 :root {
-  --bench: #1c2430;
-  --panel: #243044;
-  --track: #2a3444;
-  --ink: #f3f6fb;
-  --dim: #9aa6b5;
-  --leader: #e6b325;
-  --leader-ink: #1a1608;
+  --bg: #2c3446;
+  --card: #2a3244;
+  --ink: #f4f7fb;
+  --muted: #a8b0c0;
+  --line: #f2f5fa;
+  --blue: #2f6dff;
+  --blue-deep: #1d4ed8;
   --fail: #e15b52;
-  --chip: #3c4a5e;
   color: var(--ink);
-  background: var(--bench);
+  background: var(--bg);
   font-family: "Source Sans 3", "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.35;
 }
 
 * { box-sizing: border-box; }
-html, body, #app { margin: 0; min-height: 100%; background: var(--bench); }
-button, input { font: inherit; }
+html, body, #app { margin: 0; min-height: 100%; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
 button {
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   background: transparent;
-  color: inherit;
   cursor: pointer;
   border-radius: 2px;
-  padding: 0.55rem 0.85rem;
 }
 button:focus-visible, input:focus-visible {
-  outline: 2px solid var(--leader);
+  outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sr {
   position: absolute;
   width: 1px;
@@ -39,163 +36,232 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   clip: rect(0 0 0 0);
 }
 
-main {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 1.4rem 1.25rem 3rem;
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 1rem 1.2rem;
+  gap: 0.8rem;
 }
 
-header { margin-bottom: 1.4rem; }
-.brand { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 0.85rem; }
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
 .mark {
   margin: 0;
   font-family: Syne, sans-serif;
   font-weight: 700;
-  font-size: 1.8rem;
-  letter-spacing: -0.05em;
-  line-height: 1;
+  font-size: 1.7rem;
+  letter-spacing: -0.04em;
+  color: var(--blue);
+  text-transform: uppercase;
 }
-.lede { margin: 0; color: var(--dim); font-size: 0.95rem; }
+.versions { display: flex; gap: 0.35rem; }
+.versions button, .filters button {
+  padding: 0.35rem 0.7rem;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+.versions button.on, .filters button.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+}
 
-form { display: flex; gap: 0.45rem; }
-input {
+.composer { display: flex; gap: 0.4rem; }
+.composer input {
   flex: 1;
   min-width: 0;
-  background: var(--panel);
-  color: var(--ink);
-  border: 1px solid var(--chip);
+  background: var(--card);
+  border: 1px solid var(--line);
   border-radius: 2px;
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.75rem;
 }
-input::placeholder { color: var(--dim); }
-form button[type="submit"] {
-  background: var(--leader);
-  color: var(--leader-ink);
-  font-weight: 600;
+.composer input::placeholder { color: var(--muted); }
+.go, .file {
+  padding: 0 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
-form .file { border-color: var(--chip); color: var(--ink); }
+.go {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+}
+.filters { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 
-.deck {
-  margin: 0 0 1.1rem;
-  padding: 0.85rem 0.9rem 1rem;
-  background: var(--panel);
+.banner { margin: 0; color: var(--fail); }
+.empty { margin: 0; color: var(--muted); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  min-height: 0;
 }
-.deck-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
-.deck-head h2 {
+.layout.plain { grid-template-columns: 1fr; }
+.list, .detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.card {
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 0.75rem 0.8rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.card-hit {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: inherit;
+}
+.card.on { outline: 2px solid var(--blue); outline-offset: -2px; }
+.card h2, .detail h2 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: Syne, sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.tags { display: flex; gap: 0.35rem; }
+.tag {
+  border: 1px solid var(--line);
+  padding: 0.12rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.dl {
+  position: relative;
+  height: 46px;
+  background: var(--blue-deep);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  color: white;
+  font-weight: 700;
+  width: 100%;
+}
+.dl-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--blue);
+}
+.dl-label {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 0.6rem;
+  text-align: center;
+}
+.row-actions, .detail-actions { display: flex; gap: 0.35rem; }
+.row-actions button, .detail-actions button, .quiet {
+  padding: 0.35rem 0.6rem;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.detail {
+  border: 1px solid var(--line);
+  background: var(--card);
+  min-height: 280px;
+  padding: 0;
+  gap: 0;
+}
+.banner-stripe {
+  height: 72px;
+  border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(
+    -45deg,
+    #2a3f72,
+    #2a3f72 10px,
+    #24365f 10px,
+    #24365f 20px
+  );
+}
+.detail-body {
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.detail h2 { font-size: 1.6rem; white-space: normal; }
+
+.deck {
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 0.8rem;
+}
+.deck-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem; }
+.deck-head h2 {
+  margin: 0;
+  font-family: Syne, sans-serif;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
 .deck-label {
-  margin: 0.75rem 0 0.35rem;
-  color: var(--dim);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
+  margin: 0.7rem 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 .keys { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .key {
-  min-width: 4.2rem;
-  padding: 0.55rem 0.7rem;
-  background: var(--bench);
-  color: var(--leader);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 1.25rem;
-  letter-spacing: -0.03em;
+  min-width: 4rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  font-weight: 700;
 }
-.key.audio { color: var(--ink); font-size: 1rem; }
-.deck .quiet { color: var(--dim); padding: 0.2rem 0.4rem; }
-
-.banner { color: var(--fail); margin: 0 0 0.8rem; }
-.empty { color: var(--dim); margin: 0 0 1rem; }
-.queue { display: flex; flex-direction: column; gap: 0.55rem; }
-
-.row {
-  display: grid;
-  grid-template-columns: 5.4rem 1fr auto;
-  gap: 0.85rem;
-  align-items: center;
-  background: var(--panel);
-  padding: 0.75rem 0.85rem;
-}
-.pct {
-  margin: 0;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 1.7rem;
-  letter-spacing: -0.04em;
-  color: var(--leader);
-  font-variant-numeric: tabular-nums;
-}
-.row.done .pct { color: var(--ink); }
-.row.bad .pct { color: var(--fail); }
-.body { min-width: 0; }
-.topline { display: flex; align-items: baseline; gap: 0.55rem; min-width: 0; }
-.topline h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.chip, .state {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-  color: var(--dim);
-  flex: none;
-}
-.chip {
-  border: 1px solid var(--chip);
-  padding: 0.05rem 0.35rem;
-  text-transform: lowercase;
-}
-.meter {
-  margin-top: 0.55rem;
-  width: 100%;
-  height: 14px;
-  background: var(--track);
-  overflow: hidden;
-}
-.meter span {
-  display: block;
-  height: 100%;
-  max-width: 100%;
-  background: var(--leader);
-}
-.row.bad .meter span { background: var(--fail); }
-.meta {
-  margin: 0.35rem 0 0;
-  color: var(--dim);
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.actions { display: flex; gap: 0.2rem; }
-.actions .quiet { color: var(--dim); }
 
 .drop {
   position: fixed;
-  inset: 0.6rem;
-  border: 2px dashed var(--leader);
-  background: rgb(28 36 48 / 92%);
+  inset: 0.5rem;
+  border: 2px solid var(--line);
+  background: rgb(44 52 70 / 92%);
   display: grid;
   place-items: center;
   font-family: Syne, sans-serif;
-  font-size: 1.6rem;
-  color: var(--leader);
+  font-size: 1.4rem;
+  text-transform: uppercase;
   pointer-events: none;
 }
 
-@media (max-width: 720px) {
-  .row, form, .brand { display: flex; flex-direction: column; align-items: stretch; }
-  .pct { font-size: 1.4rem; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .composer { flex-direction: column; }
+  .go, .file { padding: 0.7rem; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .meter span { transition: width 180ms linear; }
+  .dl-fill { transition: width 180ms linear; }
 }
