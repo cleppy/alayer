@@ -4,7 +4,9 @@
 //! Yalnız `layer-engine-api` portları üzerinden konuşur; SQLite tek doğruluk kaynağıdır.
 
 pub mod db;
+pub mod queue;
 pub mod task;
 
 pub use db::{Db, DbError};
+pub use queue::QueuePolicy;
 pub use task::{InvalidTransition, Task};
