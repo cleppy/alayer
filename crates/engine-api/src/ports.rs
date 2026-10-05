@@ -40,6 +40,10 @@ pub enum CoreEvent {
     TaskRemoved {
         task_id: TaskId,
     },
+    /// Dosya adı veya başka bir alan değişti; kabuk listeyi tazeler.
+    TaskUpdated {
+        task_id: TaskId,
+    },
     /// Clipboard "sor" modu: yakalanan URL için onay isteği (M5'te kullanılır).
     IntakePrompt {
         url: String,
@@ -63,6 +67,24 @@ pub trait EventSink: Send + Sync {
 /// - Kalıcılık engine'in işi DEĞİLDİR — tek doğruluk kaynağı core'un DB'si.
 /// - `global_limit` tüm görevlerin paylaştığı hız tavanıdır. `None` = sınırsız.
 ///   Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
+#[derive(Debug, Clone)]
+pub struct MediaTaskSpec {
+    pub task_id: TaskId,
+    pub url: String,
+    pub dest_dir: std::path::PathBuf,
+}
+
+/// Sayfa linkini medyaya çeviren çözücü (yt-dlp bir implementasyondur, core onu tanımaz).
+#[async_trait::async_trait]
+pub trait MediaResolver: Send + Sync {
+    async fn download(
+        &self,
+        spec: MediaTaskSpec,
+        events: mpsc::UnboundedSender<EngineEvent>,
+        cancel: CancellationToken,
+    ) -> Result<(), EngineError>;
+}
+
 #[async_trait::async_trait]
 pub trait HttpEngine: Send + Sync {
     async fn run(

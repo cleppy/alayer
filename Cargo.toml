@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/engine-api", "crates/core", "crates/engine-http", "apps/cli", "apps/desktop/src-tauri"]
+members = ["crates/engine-api", "crates/core", "crates/engine-http", "crates/engine-bridge", "apps/cli", "apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,6 +11,7 @@ license = "MIT"
 layer-engine-api = { path = "crates/engine-api" }
 layer-core = { path = "crates/core" }
 layer-engine-http = { path = "crates/engine-http" }
+layer-engine-bridge = { path = "crates/engine-bridge" }
 layer-desktop = { path = "apps/desktop/src-tauri" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

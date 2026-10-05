@@ -53,6 +53,11 @@ impl Task {
         Self::base(TaskKind::Http, url, dest_dir, name)
     }
 
+    /// Sayfa linki (YouTube vb.). Asıl dosya adı çözücü bitince gelir.
+    pub fn new_media(url: String, dest_dir: PathBuf) -> Self {
+        Self::base(TaskKind::Media, url, dest_dir, "video".into())
+    }
+
     /// Magnet/.torrent görevi. Magnet'te gerçek ad metadata ile gelir (M3);
     /// `dn=` parametresi geçici addır.
     pub fn new_torrent(url_or_magnet: String, dest_dir: PathBuf) -> Self {

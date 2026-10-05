@@ -3,8 +3,10 @@ mod sink;
 mod view;
 
 use layer_core::{Db, QueuePolicy, TaskManager};
+use layer_engine_bridge::YtdlpResolver;
 use layer_engine_http::ReqwestHttpEngine;
 use sink::TauriSink;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -27,6 +29,13 @@ pub fn run() {
                 sink,
                 QueuePolicy::default(),
             );
+            if let Some(ytdlp) = find_sidecar("yt-dlp.exe") {
+                let ffmpeg = find_sidecar("ffmpeg.exe");
+                let node = find_node();
+                manager.set_media_resolver(Arc::new(YtdlpResolver::new(ytdlp, ffmpeg, node)));
+            } else {
+                eprintln!("yt-dlp yok: sayfa linkleri kuyrukta bekler");
+            }
             let boot = manager.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = boot.start().await {
@@ -45,4 +54,35 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("layer penceresi açılmadı");
+}
+
+fn find_sidecar(name: &str) -> Option<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(dir) = std::env::var("LAYER_SIDECARS") {
+        dirs.push(PathBuf::from(dir));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        for _ in 0..6 {
+            let Some(current) = dir else { break };
+            dirs.push(current.join("sidecars").join("bin"));
+            dirs.push(current.clone());
+            dir = current.parent().map(|p| p.to_path_buf());
+        }
+    }
+    dirs.into_iter()
+        .map(|dir| dir.join(name))
+        .find(|path| path.is_file())
+}
+
+fn find_node() -> Option<PathBuf> {
+    for candidate in [
+        PathBuf::from(r"C:\Program Files\nodejs\node.exe"),
+        PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"),
+    ] {
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }

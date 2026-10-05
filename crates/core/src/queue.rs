@@ -25,6 +25,18 @@ impl QueuePolicy {
         }
     }
 
+    /// Aynı anda tek medya çözümü. HTTP limiti bunu saymaz.
+    pub fn next_media(&self, tasks: &[Task]) -> Option<TaskId> {
+        if tasks.iter().any(|t| t.kind == TaskKind::Media && t.is_active()) {
+            return None;
+        }
+        tasks
+            .iter()
+            .filter(|t| t.kind == TaskKind::Media && t.state == TaskState::Queued)
+            .min_by_key(|t| (t.created_at, &t.id))
+            .map(|t| t.id.clone())
+    }
+
     /// Aktif HTTP görev sayısı limitin altındaysa bekleyen en eski HTTP görevi döner.
     /// Paused/Failed/Completed/Conflict sayılmaz; Torrent/Media M1'de dispatch edilmez.
     pub fn next_http(&self, tasks: &[Task]) -> Option<TaskId> {

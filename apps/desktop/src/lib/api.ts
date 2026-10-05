@@ -27,7 +27,8 @@ export type UiEvent =
       total_bytes: number | null;
       speed_bps: number;
     }
-  | { type: "removed"; task_id: string };
+  | { type: "removed"; task_id: string }
+  | { type: "updated"; task_id: string };
 
 export function listTasks(): Promise<TaskView[]> {
   return invoke("list_tasks");

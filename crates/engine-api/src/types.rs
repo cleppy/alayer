@@ -132,6 +132,8 @@ pub enum EngineEvent {
         idx: u32,
         downloaded: u64,
     },
+    /// Çözücü gerçek dosya adını bildirdi.
+    Named { file_name: String },
     /// Final dosya yerine taşındı.
     Done,
     Failed(FailureReason),

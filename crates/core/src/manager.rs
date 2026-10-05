@@ -30,6 +30,7 @@ struct Inner {
     /// Tüm görevlerin paylaştığı hız tavanı. `None` = sınırsız.
     /// Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
     global_limit: Mutex<Option<Arc<ByteBudget>>>,
+    media: Mutex<Option<Arc<dyn layer_engine_api::MediaResolver>>>,
     shutdown: CancellationToken,
     pump: Mutex<Option<tokio::task::AbortHandle>>,
     dispatched: AtomicUsize,
@@ -142,6 +143,47 @@ impl Inner {
         Ok(())
     }
 
+    async fn dispatch_media(self: &Arc<Self>, id: TaskId) -> Result<(), CoreError> {
+        let resolver = self
+            .media
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let Some(resolver) = resolver else {
+            return Ok(());
+        };
+        let mut t = self
+            .db
+            .load_task(&id)?
+            .ok_or_else(|| CoreError::NotFound(id.clone()))?;
+        if t.kind != TaskKind::Media || self.lock_running().contains_key(&id) {
+            return Ok(());
+        }
+        self.set_state(&mut t, TaskState::Downloading, None);
+        if t.state != TaskState::Downloading {
+            return Ok(());
+        }
+        let spec = layer_engine_api::MediaTaskSpec {
+            task_id: t.id.clone(),
+            url: t.url.clone(),
+            dest_dir: t.dest_dir.clone(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let cancel = CancellationToken::new();
+        self.lock_running().insert(id.clone(), cancel.clone());
+        self.dispatched.fetch_add(1, Ordering::SeqCst);
+        let run_id = id.clone();
+        tokio::spawn(async move {
+            if let Err(e) = resolver.download(spec, tx.clone(), cancel).await {
+                tracing::error!(task = %run_id, "çözücü hatası: {e}");
+                let _ = tx.send(EngineEvent::Failed(FailureReason::Resolver(e.to_string())));
+            }
+        });
+        let inner = Arc::clone(self);
+        tokio::spawn(consume_engine_events(inner, id, rx));
+        Ok(())
+    }
+
     /// Engine run bittiğinde: görev hâlâ Downloading ise motor terminal event
     /// vermeden çıkmış demektir → Failed. Sonra slot boşaltılır ve pump uyandırılır.
     async fn on_run_finished(self: &Arc<Self>, id: TaskId) {
@@ -218,6 +260,22 @@ async fn consume_engine_events(
                     progress,
                 });
             }
+            EngineEvent::Named { file_name } => {
+                if !file_name.is_empty()
+                    && !file_name.contains(['/', '\\'])
+                    && file_name != "."
+                    && file_name != ".."
+                {
+                    t.file_name = file_name;
+                    if let Err(e) = inner.db.upsert_task(&t) {
+                        tracing::error!(task = %task_id, "ad yazılamadı: {e}");
+                    } else {
+                        inner.emit(CoreEvent::TaskUpdated {
+                            task_id: task_id.clone(),
+                        });
+                    }
+                }
+            }
             EngineEvent::Done => {
                 if let Some(total) = t.total_bytes {
                     t.downloaded_bytes = total;
@@ -268,13 +326,22 @@ async fn pump_loop(inner: Arc<Inner>) {
                     break;
                 }
             };
-            let Some(id) = inner.policy.next_http(&tasks) else {
-                break;
-            };
-            if let Err(e) = inner.dispatch(id).await {
-                tracing::error!("pump: dispatch hatası: {e}");
-                break; // sıcak döngü yerine bir sonraki notify'yi bekle
+            if let Some(id) = inner.policy.next_http(&tasks) {
+                if let Err(e) = inner.dispatch(id).await {
+                    tracing::error!("pump: dispatch hatası: {e}");
+                    break;
+                }
+                continue;
             }
+            let has_media = inner.media.lock().unwrap_or_else(|e| e.into_inner()).is_some();
+            if has_media {
+                if let Some(id) = inner.policy.next_media(&tasks) {
+                    if let Err(e) = inner.dispatch_media(id).await {
+                        tracing::error!("pump: media dispatch hatası: {e}");
+                    }
+                }
+            }
+            break;
         }
     }
 }
@@ -303,11 +370,17 @@ impl TaskManager {
                 running: Mutex::new(HashMap::new()),
                 notify: Arc::new(Notify::new()),
                 global_limit: Mutex::new(None),
+                media: Mutex::new(None),
                 shutdown: CancellationToken::new(),
                 pump: Mutex::new(None),
                 dispatched: AtomicUsize::new(0),
             }),
         }
+    }
+
+    /// Sayfa linkleri (YouTube vb.) bu çözücüye gider. Yoksa Media kuyrukta bekler.
+    pub fn set_media_resolver(&self, resolver: Arc<dyn layer_engine_api::MediaResolver>) {
+        *self.inner.media.lock().unwrap_or_else(|e| e.into_inner()) = Some(resolver);
     }
 
     /// Tüm görevlerin paylaştığı hız tavanı. `None` kaldırır.
@@ -347,7 +420,8 @@ impl TaskManager {
         let kind = classify_url(&url)
             .ok_or_else(|| CoreError::InvalidState(format!("desteklenmeyen şema: {url}")))?;
         let task = match kind {
-            TaskKind::Http | TaskKind::Media => Task::new_http(url.clone(), dest_dir, None),
+            TaskKind::Http => Task::new_http(url.clone(), dest_dir, None),
+            TaskKind::Media => Task::new_media(url.clone(), dest_dir),
             TaskKind::Torrent => Task::new_torrent(url.clone(), dest_dir),
         };
         self.inner.db.upsert_task(&task)?;
@@ -550,6 +624,24 @@ mod tests {
         }
     }
 
+    struct FakeMedia {
+        calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl layer_engine_api::MediaResolver for FakeMedia {
+        async fn download(
+            &self,
+            spec: layer_engine_api::MediaTaskSpec,
+            events: mpsc::UnboundedSender<EngineEvent>,
+            _cancel: CancellationToken,
+        ) -> Result<(), EngineError> {
+            self.calls.lock().unwrap().push(spec.url);
+            let _ = events.send(EngineEvent::Done);
+            Ok(())
+        }
+    }
+
     struct FakeEngine {
         events: Vec<EngineEvent>,
         hold: bool,
@@ -666,6 +758,55 @@ mod tests {
         assert_eq!(t.kind, TaskKind::Http);
         assert!(ctx.sink.has_added(&id, TaskKind::Http, IntakeSource::Ui));
         assert_eq!(t.file_name, "f.bin");
+    }
+
+    #[tokio::test]
+    async fn youtube_page_is_not_saved_as_a_file() {
+        let engine = FakeEngine::scripted(vec![EngineEvent::Done]);
+        let calls = engine.calls.clone();
+        let ctx = setup(engine, QueuePolicy::default());
+        ctx.manager.start().await.unwrap();
+        let id = ctx
+            .manager
+            .intake(
+                IntakeSource::Ui,
+                "https://youtu.be/RRuqmvda7w8".into(),
+                ctx.dest.clone(),
+            )
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        let t = ctx.db.load_task(&id).unwrap().unwrap();
+        assert_eq!(t.kind, TaskKind::Media, "youtube Media olmalı");
+        assert_eq!(
+            calls.lock().unwrap().len(),
+            0,
+            "izleme sayfası HTTP motoruna gitmemeli"
+        );
+        assert_ne!(t.state, TaskState::Completed);
+    }
+
+    #[tokio::test]
+    async fn youtube_goes_to_media_resolver_not_http() {
+        let engine = FakeEngine::scripted(vec![EngineEvent::Done]);
+        let http_calls = engine.calls.clone();
+        let ctx = setup(engine, QueuePolicy::default());
+        let media_calls = Arc::new(Mutex::new(Vec::<String>::new()));
+        let seen = media_calls.clone();
+        ctx.manager.set_media_resolver(Arc::new(FakeMedia { calls: seen }));
+        ctx.manager.start().await.unwrap();
+        let id = ctx
+            .manager
+            .intake(
+                IntakeSource::Ui,
+                "https://youtu.be/RRuqmvda7w8".into(),
+                ctx.dest.clone(),
+            )
+            .await
+            .unwrap();
+        wait_for(|| state_of(&ctx, &id) == Some(TaskState::Completed)).await;
+        assert_eq!(http_calls.lock().unwrap().len(), 0);
+        assert_eq!(media_calls.lock().unwrap().as_slice(), ["https://youtu.be/RRuqmvda7w8"]);
     }
 
     #[tokio::test]

@@ -12,6 +12,7 @@ dist/
 layer.db
 layer.db-*
 sidecars/bin/
+*.exe
 
 # Tauri
 apps/desktop/src-tauri/gen/

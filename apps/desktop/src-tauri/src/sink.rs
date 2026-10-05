@@ -27,6 +27,9 @@ pub enum UiEvent {
     Removed {
         task_id: String,
     },
+    Updated {
+        task_id: String,
+    },
 }
 
 pub struct TauriSink {
@@ -94,6 +97,7 @@ impl EventSink for TauriSink {
                 failure: Some("kaynak değişti, parçalar birleştirilemez".into()),
             }),
             CoreEvent::TaskRemoved { task_id } => self.send(UiEvent::Removed { task_id }),
+            CoreEvent::TaskUpdated { task_id } => self.send(UiEvent::Updated { task_id }),
             CoreEvent::IntakePrompt { .. } => {}
         }
     }
