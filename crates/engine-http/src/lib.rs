@@ -9,6 +9,7 @@
 mod download;
 mod http;
 mod probe;
+mod segmented;
 
 use download::{run_single, SingleOutcome};
 use http::{policy_for_tests, RetryPolicy};
@@ -104,19 +105,52 @@ impl HttpEngine for ReqwestHttpEngine {
             range_ok: probe.range_ok,
         });
 
-        // Task 9 segmented'i buraya bağlar. M1 Task 8: her zaman tek bağlantı.
+        if let Some(stored) = spec.resume.as_ref().and_then(|r| r.etag.clone()) {
+            if probe.etag.as_ref().is_some_and(|cur| cur != &stored) {
+                let _ = events.send(EngineEvent::ConflictDetected);
+                return Ok(());
+            }
+        }
+
         let budgets = budgets_for(&spec, global_limit);
-        match run_single(
-            &self.client,
-            &spec,
-            &probe,
-            &events,
-            &cancel,
-            &budgets,
-            &self.retry,
-        )
-        .await?
-        {
+        let segmented_ok = probe.range_ok
+            && probe.total_bytes.is_some()
+            && spec.max_segments > 1
+            && probe.total_bytes.unwrap_or(0) >= segmented::MIN_SEGMENT;
+        let outcome = if segmented_ok {
+            let total = probe.total_bytes.unwrap_or(0);
+            let segs = segmented::plan(total, spec.max_segments, spec.resume.as_ref());
+            match segmented::run_segmented(
+                &self.client,
+                &spec,
+                &probe,
+                segs,
+                &events,
+                &cancel,
+                &budgets,
+                &self.retry,
+            )
+            .await?
+            {
+                segmented::SegmentedOutcome::Completed => SingleOutcome::Completed,
+                segmented::SegmentedOutcome::Cancelled => SingleOutcome::Cancelled,
+                segmented::SegmentedOutcome::Conflict => SingleOutcome::Conflict,
+                segmented::SegmentedOutcome::NeedReResolve => SingleOutcome::NeedReResolve,
+                segmented::SegmentedOutcome::Failed(r) => SingleOutcome::Failed(r),
+            }
+        } else {
+            run_single(
+                &self.client,
+                &spec,
+                &probe,
+                &events,
+                &cancel,
+                &budgets,
+                &self.retry,
+            )
+            .await?
+        };
+        match outcome {
             SingleOutcome::Completed => {
                 let _ = events.send(EngineEvent::Done);
             }
