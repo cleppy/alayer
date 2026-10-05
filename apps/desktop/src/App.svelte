@@ -193,7 +193,7 @@
   <header>
     <div class="brand">
       <p class="mark">layer</p>
-      <p class="lede">Link, magnet veya torrent. İlerleme burada durur.</p>
+      <p class="lede">Link, magnet veya torrent.</p>
     </div>
     <form onsubmit={submit}>
       <label class="sr" for="url">İndirme linki veya magnet</label>

@@ -328,15 +328,20 @@ async fn consume_engine_events(
                 }
             }
             EngineEvent::Done => {
-                if let Some(total) = t.total_bytes {
-                    t.downloaded_bytes = total;
-                } else {
-                    t.downloaded_bytes = t
-                        .segments
-                        .iter()
-                        .map(|s| s.downloaded)
-                        .sum::<u64>()
-                        .max(t.downloaded_bytes);
+                if let Ok(meta) = std::fs::metadata(t.final_path()) {
+                    let len = meta.len();
+                    if len > 0 {
+                        t.downloaded_bytes = len;
+                        t.total_bytes = Some(len);
+                    }
+                }
+                if t.downloaded_bytes == 0 {
+                    if let Some(total) = t.total_bytes {
+                        t.downloaded_bytes = total;
+                    }
+                }
+                if t.total_bytes.is_none() && t.downloaded_bytes > 0 {
+                    t.total_bytes = Some(t.downloaded_bytes);
                 }
                 inner.set_state(&mut t, TaskState::Completed, None);
             }
@@ -697,7 +702,22 @@ impl TaskManager {
 
     /// Kuyruk anlık görüntüsü. Kabuk bunu UI DTO'suna çevirir.
     pub fn list(&self) -> Result<Vec<Task>, CoreError> {
-        Ok(self.inner.db.list_tasks()?)
+        let mut tasks = self.inner.db.list_tasks()?;
+        for task in &mut tasks {
+            if task.state != TaskState::Completed || task.downloaded_bytes > 0 {
+                continue;
+            }
+            let path = task.final_path();
+            if let Ok(meta) = std::fs::metadata(&path) {
+                let len = meta.len();
+                if len > 0 {
+                    task.downloaded_bytes = len;
+                    task.total_bytes = Some(len);
+                    let _ = self.inner.db.upsert_task(task);
+                }
+            }
+        }
+        Ok(tasks)
     }
 }
 

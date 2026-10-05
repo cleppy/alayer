@@ -66,9 +66,10 @@ impl MediaResolver for YtdlpResolver {
         cancel: CancellationToken,
     ) -> Result<(), EngineError> {
         std::fs::create_dir_all(&spec.dest_dir)?;
+        let stamp = spec.task_id.chars().take(8).collect::<String>();
         let out_tmpl = spec
             .dest_dir
-            .join("%(title).180B [%(id)s].%(ext)s");
+            .join(format!("{stamp} %(title).120B.%(ext)s"));
         let path_file = spec.dest_dir.join(format!("{}.path", spec.task_id));
         let _ = std::fs::remove_file(&path_file);
 
@@ -115,17 +116,43 @@ impl MediaResolver for YtdlpResolver {
         let mut child = cmd.spawn().map_err(|e| EngineError::Internal(e.to_string()))?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
+        let events_err = events.clone();
         let err_task = tokio::spawn(async move {
             let Some(stderr) = stderr else { return String::new() };
             let mut lines = BufReader::new(stderr).lines();
             let mut kept = String::new();
             while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(progress) = parse_progress(&line) {
+                    let _ = events_err.send(EngineEvent::Progress(progress));
+                }
                 if kept.len() < 4000 {
                     kept.push_str(&line);
                     kept.push('\n');
                 }
             }
             kept
+        });
+        let watch_dir = spec.dest_dir.clone();
+        let watch_prefix = stamp.clone();
+        let events_watch = events.clone();
+        let cancel_watch = cancel.clone();
+        let watch = tokio::spawn(async move {
+            let mut last = 0u64;
+            loop {
+                if cancel_watch.is_cancelled() {
+                    break;
+                }
+                let size = growing_bytes(&watch_dir, &watch_prefix);
+                if size > last {
+                    last = size;
+                    let _ = events_watch.send(EngineEvent::Progress(layer_engine_api::Progress {
+                        downloaded_bytes: size,
+                        total_bytes: None,
+                        speed_bps: 0.0,
+                    }));
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            }
         });
 
         let read = async {
@@ -149,6 +176,7 @@ impl MediaResolver for YtdlpResolver {
         }
 
         let status = child.wait().await.map_err(|e| EngineError::Internal(e.to_string()))?;
+        watch.abort();
         let stderr = err_task.await.unwrap_or_default();
         if cancel.is_cancelled() {
             return Ok(());
@@ -172,6 +200,25 @@ impl MediaResolver for YtdlpResolver {
         }
         Ok(())
     }
+}
+
+fn growing_bytes(dir: &Path, prefix: &str) -> u64 {
+    let mut max = 0u64;
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with(prefix) || name.ends_with(".path") {
+            continue;
+        }
+        if let Ok(meta) = entry.metadata() {
+            if meta.is_file() {
+                max = max.max(meta.len());
+            }
+        }
+    }
+    max
 }
 
 fn tail(s: &str) -> String {

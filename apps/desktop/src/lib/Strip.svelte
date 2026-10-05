@@ -16,7 +16,11 @@
     onCancel: (id: string) => void;
   } = $props();
 
-  const width = $derived(`${Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 1000) / 10}%`);
+  const width = $derived(
+    task.state === "completed"
+      ? "100%"
+      : `${Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 1000) / 10}%`,
+  );
   const active = $derived(task.state === "downloading" || task.state === "queued");
   const canResume = $derived(
     task.state === "paused" || task.state === "failed" || task.state === "conflict",
@@ -34,7 +38,7 @@
       <span class="state">{waiting ? "çözülüyor" : stateLabel(task.state)}</span>
     </div>
     <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 100)} aria-label={task.file_name}>
-      <span style="width: {width}"></span>
+      <span style:width={width}></span>
     </div>
     <p class="meta">
       {bytes(task.downloaded_bytes)} / {bytes(task.total_bytes)}

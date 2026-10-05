@@ -153,15 +153,16 @@ form .file { border-color: var(--chip); color: var(--ink); }
   text-transform: lowercase;
 }
 .meter {
-  margin-top: 0.45rem;
-  height: 8px;
+  margin-top: 0.55rem;
+  width: 100%;
+  height: 14px;
   background: var(--track);
   overflow: hidden;
 }
 .meter span {
   display: block;
   height: 100%;
-  width: 0;
+  max-width: 100%;
   background: var(--leader);
 }
 .row.bad .meter span { background: var(--fail); }
