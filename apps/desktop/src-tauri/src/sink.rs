@@ -2,7 +2,7 @@ use layer_engine_api::{CoreEvent, EventSink};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 const PROGRESS_GAP: Duration = Duration::from_millis(250);
 
@@ -29,6 +29,10 @@ pub enum UiEvent {
     },
     Updated {
         task_id: String,
+    },
+    Files {
+        task_id: String,
+        files: Vec<layer_engine_api::TorrentFile>,
     },
 }
 
@@ -66,8 +70,28 @@ impl EventSink for TauriSink {
                 task_id,
                 new,
                 failure,
+                file_name,
                 ..
             } => {
+                if new == layer_engine_api::TaskState::Completed {
+                    use tauri_plugin_notification::NotificationExt;
+                    let name = if file_name.trim().is_empty() {
+                        "Download".to_string()
+                    } else {
+                        file_name
+                    };
+                    let _ = self
+                        .app
+                        .notification()
+                        .builder()
+                        .title("Download finished")
+                        .body(name)
+                        .show();
+                    if let Some(window) = self.app.get_webview_window("main") {
+                        let _ = window
+                            .request_user_attention(Some(tauri::UserAttentionType::Informational));
+                    }
+                }
                 let state = serde_json::to_value(new)
                     .ok()
                     .and_then(|v| v.as_str().map(str::to_string))
@@ -98,6 +122,9 @@ impl EventSink for TauriSink {
             }),
             CoreEvent::TaskRemoved { task_id } => self.send(UiEvent::Removed { task_id }),
             CoreEvent::TaskUpdated { task_id } => self.send(UiEvent::Updated { task_id }),
+            CoreEvent::TorrentFiles { task_id, files } => {
+                self.send(UiEvent::Files { task_id, files })
+            }
             CoreEvent::IntakePrompt { .. } => {}
         }
     }

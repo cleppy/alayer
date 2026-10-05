@@ -4,11 +4,21 @@ kendi indirme yöneticin: segmented HTTP(S) + torrent + "link yapıştır" medya
 
 ## Durum
 
-- **M1 ✅** — headless çekirdek: `engine-api`, `core` (SQLite + kuyruk + TaskManager), `engine-http` (segmented, resume, If-Range conflict, retry), `layer-cli`
-- **M2 (kabuk ayakta)** — Tauri + Svelte kuyruk: link yapıştır, duraklat, sürdür, iptal. Ayarlar paneli henüz yok.
-- M3 — torrent köprüsü (aria2 sidecar)
-- M4 — medya çözücü (yt-dlp sidecar, ffmpeg mux-only)
-- M5 — clipboard listener, kategoriler, paketleme
+- Segmented HTTP, torrent (aria2) ve sayfa linki (yt-dlp + ffmpeg)
+- Hız tavanı: görev başına ve tüm uygulama (MB/s)
+- Torrent dosya seçimi, kapanınca kaldığı yerden video/torrent devamı
+- Bitti bildirimi, Sharp/Soft tema, küp ilerleme
+- Sidecar'lar (`yt-dlp`, `ffmpeg`, `aria2c`) repoda yok: `sidecars/bin`
+
+## Kurulum
+
+```
+cd apps/desktop
+pnpm install
+pnpm tauri build
+```
+
+Kurulum dosyası: `apps/desktop/src-tauri/target/release/bundle/nsis/`. Konsolsuz çalıştırılabilir: `apps/desktop/src-tauri/target/release/layer-desktop.exe`.
 
 ## Repo düzeni
 

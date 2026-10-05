@@ -34,7 +34,9 @@ async fn spawn_flaky(body: Vec<u8>, fail_times: u32) -> (std::net::SocketAddr, A
     let hits_c = hits.clone();
     tokio::spawn(async move {
         loop {
-            let Ok((sock, _)) = listener.accept().await else { break };
+            let Ok((sock, _)) = listener.accept().await else {
+                break;
+            };
             let body = body.clone();
             let hits = hits_c.clone();
             tokio::spawn(async move {
@@ -43,8 +45,12 @@ async fn spawn_flaky(body: Vec<u8>, fail_times: u32) -> (std::net::SocketAddr, A
                 let mut reader = BufReader::new(r);
                 loop {
                     let mut line = String::new();
-                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 { return; }
-                    if line == "\r\n" { break; }
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if line == "\r\n" {
+                        break;
+                    }
                 }
                 if n < fail_times {
                     let _ = w.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
@@ -91,10 +97,17 @@ async fn exhausted_503_fails() {
     let engine = ReqwestHttpEngine::for_tests();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let spec = spec(format!("http://{addr}/f.bin"), dir.path().join("dl"));
-    engine.run(spec, tx, CancellationToken::new(), None).await.unwrap();
+    engine
+        .run(spec, tx, CancellationToken::new(), None)
+        .await
+        .unwrap();
     let mut failed = false;
     while let Some(ev) = rx.recv().await {
-        if matches!(ev, EngineEvent::Failed(FailureReason::Http { status: 503, .. }) | EngineEvent::Failed(FailureReason::Network(_))) {
+        if matches!(
+            ev,
+            EngineEvent::Failed(FailureReason::Http { status: 503, .. })
+                | EngineEvent::Failed(FailureReason::Network(_))
+        ) {
             failed = true;
         }
     }

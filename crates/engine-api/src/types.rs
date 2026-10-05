@@ -20,7 +20,10 @@ pub enum TaskKind {
 #[serde(tag = "reason", content = "detail", rename_all = "snake_case")]
 pub enum FailureReason {
     Network(String),
-    Http { status: u16, message: String },
+    Http {
+        status: u16,
+        message: String,
+    },
     /// 403/410 alındı ve resolver yok ya da yeniden çözüm başarısız.
     ResolverRequired,
     /// yt-dlp hata sınıflandırması (M4).
@@ -36,9 +39,7 @@ impl FailureReason {
         match self {
             FailureReason::Network(m) => format!("network error: {m}"),
             FailureReason::Http { status, message } => format!("HTTP {status}: {message}"),
-            FailureReason::ResolverRequired => {
-                "link expired and there is no resolver".to_string()
-            }
+            FailureReason::ResolverRequired => "link expired and there is no resolver".to_string(),
             FailureReason::Resolver(m) => format!("resolver error: {m}"),
             FailureReason::Io(m) => format!("disk error: {m}"),
             FailureReason::Torrent(m) => format!("torrent error: {m}"),
@@ -136,7 +137,13 @@ pub enum EngineEvent {
         downloaded: u64,
     },
     /// Çözücü gerçek dosya adını bildirdi.
-    Named { file_name: String },
+    Named {
+        file_name: String,
+    },
+    /// Torrent içindeki dosyalar. İndirme seçimden sonra başlar.
+    TorrentFiles {
+        files: Vec<TorrentFile>,
+    },
     /// Final dosya yerine taşındı.
     Done,
     Failed(FailureReason),
@@ -144,6 +151,14 @@ pub enum EngineEvent {
     ConflictDetected,
     /// 403/410 — ResolverContext ile tazeleme gerekli (kör retry YASAK).
     NeedReResolve,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TorrentFile {
+    /// aria2 1-based index.
+    pub index: u32,
+    pub name: String,
+    pub length: u64,
 }
 
 #[derive(Debug, thiserror::Error)]

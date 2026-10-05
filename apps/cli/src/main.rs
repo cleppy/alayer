@@ -29,9 +29,15 @@ enum Cmd {
         limit: Option<u64>,
     },
     List,
-    Pause { id: String },
-    Resume { id: String },
-    Cancel { id: String },
+    Pause {
+        id: String,
+    },
+    Resume {
+        id: String,
+    },
+    Cancel {
+        id: String,
+    },
 }
 
 fn open_db(path: &std::path::Path) -> Arc<Db> {
@@ -108,7 +114,11 @@ async fn main() {
                 }
             }
             mgr.shutdown().await;
-            let ok = sink.exit_ok.lock().unwrap_or_else(|e| e.into_inner()).unwrap_or(false);
+            let ok = sink
+                .exit_ok
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or(false);
             std::process::exit(if ok { 0 } else { 1 });
         }
         Cmd::Pause { id } => {

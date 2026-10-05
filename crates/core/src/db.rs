@@ -64,7 +64,10 @@ fn from_i64(v: i64) -> u64 {
     v.try_into().unwrap_or(u64::MAX)
 }
 
-fn json_col<T: serde::de::DeserializeOwned>(row: &rusqlite::Row, idx: usize) -> rusqlite::Result<T> {
+fn json_col<T: serde::de::DeserializeOwned>(
+    row: &rusqlite::Row,
+    idx: usize,
+) -> rusqlite::Result<T> {
     let s: String = row.get(idx)?;
     serde_json::from_str(&s).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(idx, rusqlite::types::Type::Text, Box::new(e))
@@ -78,15 +81,9 @@ fn json_col_opt<T: serde::de::DeserializeOwned>(
     let s: Option<String> = row.get(idx)?;
     match s {
         None => Ok(None),
-        Some(s) => serde_json::from_str(&s)
-            .map(Some)
-            .map_err(|e| {
-                rusqlite::Error::FromSqlConversionFailure(
-                    idx,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
-                )
-            }),
+        Some(s) => serde_json::from_str(&s).map(Some).map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(idx, rusqlite::types::Type::Text, Box::new(e))
+        }),
     }
 }
 
@@ -213,9 +210,7 @@ impl Db {
     pub fn load_task(&self, id: &str) -> Result<Option<Task>, DbError> {
         let conn = self.lock();
         let sql = format!("SELECT {TASK_COLS} FROM tasks WHERE id = ?1");
-        let task = conn
-            .query_row(&sql, params![id], row_to_task)
-            .optional()?;
+        let task = conn.query_row(&sql, params![id], row_to_task).optional()?;
         Ok(task)
     }
 
@@ -232,7 +227,12 @@ impl Db {
     }
 
     /// Yalnız bayt alanları. Durum yazısı bunu ezemez.
-    pub fn set_progress(&self, id: &str, downloaded: u64, total: Option<u64>) -> Result<(), DbError> {
+    pub fn set_progress(
+        &self,
+        id: &str,
+        downloaded: u64,
+        total: Option<u64>,
+    ) -> Result<(), DbError> {
         let conn = self.lock();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -429,9 +429,15 @@ mod tests {
         let db = mem_db();
         assert_eq!(db.get_setting("max_segments").unwrap(), None);
         db.set_setting("max_segments", "8").unwrap();
-        assert_eq!(db.get_setting("max_segments").unwrap().as_deref(), Some("8"));
+        assert_eq!(
+            db.get_setting("max_segments").unwrap().as_deref(),
+            Some("8")
+        );
         db.set_setting("max_segments", "4").unwrap();
-        assert_eq!(db.get_setting("max_segments").unwrap().as_deref(), Some("4"));
+        assert_eq!(
+            db.get_setting("max_segments").unwrap().as_deref(),
+            Some("4")
+        );
     }
 
     #[test]

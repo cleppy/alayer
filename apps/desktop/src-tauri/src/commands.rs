@@ -2,9 +2,10 @@ use crate::view::{to_view, TaskView};
 use crate::Tools;
 use layer_core::{classify_url, TaskManager};
 use layer_engine_api::{IntakeSource, TaskKind};
-use layer_engine_bridge::probe_media;
+use layer_engine_bridge::{probe_media, Aria2Engine};
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
 
 fn downloads(app: &AppHandle) -> Result<PathBuf, String> {
@@ -48,10 +49,7 @@ pub async fn prepare_download(tools: State<'_, Tools>, url: String) -> Result<Pr
     let url = url.trim().to_string();
     match classify_url(&url) {
         Some(TaskKind::Media) => {
-            let ytdlp = tools
-                .ytdlp
-                .as_ref()
-                .ok_or("yt-dlp is missing")?;
+            let ytdlp = tools.ytdlp.as_ref().ok_or("yt-dlp is missing")?;
             let (title, choices) = probe_media(ytdlp, tools.node.as_deref(), &url).await?;
             Ok(Prepare::Choose {
                 title,
@@ -123,6 +121,77 @@ pub fn open_downloads(app: AppHandle) -> Result<(), String> {
         .arg(dir)
         .spawn()
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn confirm_torrent_files(
+    state: State<'_, TaskManager>,
+    aria: State<'_, Option<Arc<Aria2Engine>>>,
+    id: String,
+    indices: Vec<u32>,
+) -> Result<(), String> {
+    if indices.is_empty() {
+        return Err("Select at least one file.".into());
+    }
+    state
+        .remember_torrent_files(&id, &indices)
+        .map_err(|e| e.to_string())?;
+    let Some(aria) = aria.as_ref() else {
+        return Err("aria2 is missing".into());
+    };
+    if aria.submit_files(&id, indices) {
+        Ok(())
+    } else {
+        Err("file picker is no longer waiting".into())
+    }
+}
+
+#[tauri::command]
+pub fn global_limit_mb(state: State<'_, TaskManager>) -> f64 {
+    state
+        .global_limit_bps()
+        .map(|bps| bps as f64 / (1024.0 * 1024.0))
+        .unwrap_or(0.0)
+}
+
+#[tauri::command]
+pub async fn set_global_limit_mb(
+    state: State<'_, TaskManager>,
+    aria: State<'_, Option<Arc<Aria2Engine>>>,
+    mbps: f64,
+) -> Result<(), String> {
+    let bps = if mbps <= 0.0 {
+        None
+    } else {
+        Some((mbps * 1024.0 * 1024.0) as u64)
+    };
+    state.set_global_limit(bps);
+    if let Some(aria) = aria.as_ref() {
+        aria.set_global_limit(bps).await;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_task_limit_mb(
+    state: State<'_, TaskManager>,
+    aria: State<'_, Option<Arc<Aria2Engine>>>,
+    id: String,
+    mbps: f64,
+) -> Result<(), String> {
+    let bps = if mbps <= 0.0 {
+        None
+    } else {
+        Some((mbps * 1024.0 * 1024.0) as u64)
+    };
+    state
+        .set_task_speed_limit(&id, bps)
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(aria) = aria.as_ref() {
+        aria.set_task_limit(&id, bps).await;
+    }
     Ok(())
 }
 

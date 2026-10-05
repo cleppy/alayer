@@ -120,23 +120,38 @@ async fn chunked_without_length_is_unknown_total() {
     let payload = body.clone();
     tokio::spawn(async move {
         loop {
-            let Ok((sock, _)) = listener.accept().await else { break };
+            let Ok((sock, _)) = listener.accept().await else {
+                break;
+            };
             let payload = payload.clone();
             tokio::spawn(async move {
                 let (r, mut w) = tokio::io::split(sock);
                 let mut reader = tokio::io::BufReader::new(r);
                 loop {
                     let mut line = String::new();
-                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 { return; }
-                    if line == "\r\n" { break; }
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if line == "\r\n" {
+                        break;
+                    }
                 }
-                let head = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
-                if w.write_all(head).await.is_err() { return; }
+                let head =
+                    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+                if w.write_all(head).await.is_err() {
+                    return;
+                }
                 for chunk in payload.chunks(8192) {
                     let frame = format!("{:x}\r\n", chunk.len());
-                    if w.write_all(frame.as_bytes()).await.is_err() { return; }
-                    if w.write_all(chunk).await.is_err() { return; }
-                    if w.write_all(b"\r\n").await.is_err() { return; }
+                    if w.write_all(frame.as_bytes()).await.is_err() {
+                        return;
+                    }
+                    if w.write_all(chunk).await.is_err() {
+                        return;
+                    }
+                    if w.write_all(b"\r\n").await.is_err() {
+                        return;
+                    }
                 }
                 let _ = w.write_all(b"0\r\n\r\n").await;
                 let _ = w.flush().await;
@@ -212,7 +227,11 @@ async fn cancel_mid_download_keeps_part() {
     assert!(!dest.join("f.bin").exists(), "final oluşmamalı");
     let written = std::fs::read(&part).unwrap();
     assert!(!written.is_empty());
-    assert_eq!(&written[..], &body[..written.len()], ".part prefix doğru olmalı");
+    assert_eq!(
+        &written[..],
+        &body[..written.len()],
+        ".part prefix doğru olmalı"
+    );
 }
 
 #[tokio::test]
@@ -318,7 +337,9 @@ async fn probe_403_is_not_reresolve() {
     .await;
     res.unwrap();
     assert!(
-        !events.iter().any(|e| matches!(e, EngineEvent::NeedReResolve)),
+        !events
+            .iter()
+            .any(|e| matches!(e, EngineEvent::NeedReResolve)),
         "probe 403 NeedReResolve olmamalı"
     );
     let (_, _, range_ok) = probed(&events).expect("Probed");
@@ -353,7 +374,9 @@ async fn body_403_emits_need_reresolve() {
     .await;
     res.unwrap();
     assert!(
-        events.iter().any(|e| matches!(e, EngineEvent::NeedReResolve)),
+        events
+            .iter()
+            .any(|e| matches!(e, EngineEvent::NeedReResolve)),
         "indirme 403 → NeedReResolve"
     );
     let n = server.received_requests().await.unwrap().len();
@@ -457,7 +480,10 @@ async fn accept_ranges_lie_falls_back_to_single() {
             _ => None,
         })
         .collect();
-    assert!(plans.iter().all(|n| *n <= 1), "yalancı range çoklu segment üretmemeli: {plans:?}");
+    assert!(
+        plans.iter().all(|n| *n <= 1),
+        "yalancı range çoklu segment üretmemeli: {plans:?}"
+    );
     assert_eq!(std::fs::read(dest.join("f.bin")).unwrap(), body);
 }
 

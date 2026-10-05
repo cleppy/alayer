@@ -24,7 +24,11 @@ pub async fn probe_media(
     let out = cmd.output().await.map_err(|e| e.to_string())?;
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
-        let line = err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("çözülemedi");
+        let line = err
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("çözülemedi");
         return Err(line.to_string());
     }
     let info: serde_json::Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
@@ -67,9 +71,7 @@ impl MediaResolver for YtdlpResolver {
     ) -> Result<(), EngineError> {
         std::fs::create_dir_all(&spec.dest_dir)?;
         let stamp = spec.task_id.chars().take(8).collect::<String>();
-        let out_tmpl = spec
-            .dest_dir
-            .join(format!("{stamp} %(title).120B.%(ext)s"));
+        let out_tmpl = spec.dest_dir.join(format!("{stamp} %(title).120B.%(ext)s"));
         let path_file = spec.dest_dir.join(format!("{}.path", spec.task_id));
         let _ = std::fs::remove_file(&path_file);
 
@@ -104,21 +106,31 @@ impl MediaResolver for YtdlpResolver {
                 cmd.arg("--merge-output-format").arg("mp4");
             }
         } else if self.ffmpeg_dir.is_some() {
-            cmd.arg("-f").arg("bv*+ba/b").arg("--merge-output-format").arg("mp4");
+            cmd.arg("-f")
+                .arg("bv*+ba/b")
+                .arg("--merge-output-format")
+                .arg("mp4");
         } else {
             cmd.arg("-f").arg("b");
+        }
+        if let Some(bps) = spec.speed_limit_bps.filter(|n| *n > 0) {
+            cmd.arg("--limit-rate").arg(bps.to_string());
         }
         cmd.arg(&spec.url)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        let mut child = cmd.spawn().map_err(|e| EngineError::Internal(e.to_string()))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| EngineError::Internal(e.to_string()))?;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
         let events_err = events.clone();
         let err_task = tokio::spawn(async move {
-            let Some(stderr) = stderr else { return String::new() };
+            let Some(stderr) = stderr else {
+                return String::new();
+            };
             let mut lines = BufReader::new(stderr).lines();
             let mut kept = String::new();
             while let Ok(Some(line)) = lines.next_line().await {
@@ -175,7 +187,10 @@ impl MediaResolver for YtdlpResolver {
             _ = read => {}
         }
 
-        let status = child.wait().await.map_err(|e| EngineError::Internal(e.to_string()))?;
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| EngineError::Internal(e.to_string()))?;
         watch.abort();
         let stderr = err_task.await.unwrap_or_default();
         if cancel.is_cancelled() {

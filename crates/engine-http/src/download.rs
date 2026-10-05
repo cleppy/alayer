@@ -79,7 +79,11 @@ pub async fn run_single(
         }
         let start_at = file.metadata().await.map(|m| m.len()).unwrap_or(offset);
         file.seek(std::io::SeekFrom::Start(start_at)).await?;
-        match fetch_body(client, spec, probe, start_at, &mut file, events, cancel, budgets).await {
+        match fetch_body(
+            client, spec, probe, start_at, &mut file, events, cancel, budgets,
+        )
+        .await
+        {
             Ok(SingleOutcome::Completed) => {
                 drop(file);
                 if let Err(e) = std::fs::rename(&part, &final_p) {
@@ -100,7 +104,10 @@ pub async fn run_single(
                 }
             }
             Err(FetchErr::Http { status, message }) => {
-                return Ok(SingleOutcome::Failed(FailureReason::Http { status, message }));
+                return Ok(SingleOutcome::Failed(FailureReason::Http {
+                    status,
+                    message,
+                }));
             }
             Err(FetchErr::Io(e)) => return Err(e.into()),
         }
@@ -135,7 +142,10 @@ async fn fetch_body(
     }
     req = apply_headers(req, &spec.headers);
 
-    let resp = req.send().await.map_err(|e| FetchErr::Transient(e.to_string()))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| FetchErr::Transient(e.to_string()))?;
     let status = resp.status();
 
     if is_expired_url(status) {

@@ -8,13 +8,23 @@
     onPause,
     onResume,
     onCancel,
+    onLimit,
   }: {
     task: TaskView;
     rate?: number;
     onPause: (id: string) => void;
     onResume: (id: string) => void;
     onCancel: (id: string) => void;
+    onLimit: (id: string, raw: string) => void;
   } = $props();
+
+  function mbLabel(bps: number | null | undefined): string {
+    if (!bps) return "";
+    const mb = bps / (1024 * 1024);
+    return mb >= 10 ? String(Math.round(mb)) : String(Math.round(mb * 10) / 10);
+  }
+
+  let limit = $state(mbLabel(task.speed_limit_bps));
 
   const ratio = $derived(
     task.state === "completed" ? 1 : fraction(task.downloaded_bytes, task.total_bytes),
@@ -72,6 +82,13 @@
     {#if canResume}
       <button type="button" onclick={() => onResume(task.id)}>Resume</button>
     {/if}
+    <input
+      class="limit"
+      bind:value={limit}
+      placeholder="MB/s"
+      aria-label="Speed limit"
+      onchange={() => onLimit(task.id, limit)}
+    />
     <button type="button" onclick={() => onCancel(task.id)}>
       {task.state === "completed" ? "Remove" : "Cancel"}
     </button>

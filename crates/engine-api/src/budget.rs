@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 /// ile byte hakkı ister; bütçe boşsa refill hızında uyutulur.
 #[derive(Debug)]
 pub struct ByteBudget {
-    capacity_bps: u64,
+    capacity_bps: AtomicU64,
     /// Birikmiş kredi (byte). Başlangıçta capacity kadar (burst izni).
     tokens: Mutex<f64>,
     /// Kredi talepleri sıraya girer (fairness): aynı anda tek bekleyen grubu.
@@ -29,18 +29,24 @@ fn now_ms() -> u64 {
 impl ByteBudget {
     pub fn new(capacity_bps: u64) -> Self {
         Self {
-            capacity_bps,
+            capacity_bps: AtomicU64::new(capacity_bps),
             tokens: Mutex::new(capacity_bps as f64),
             gate: Mutex::new(()),
             last_refill_ms: AtomicU64::new(now_ms()),
         }
     }
 
+    /// Canlı ayar. `0` sınırı kaldırır. Aynı `Arc`ı tutan çalışan indirmeler
+    /// bir sonraki chunk'ta yeni hızı görür.
+    pub fn set_capacity(&self, bps: u64) {
+        self.capacity_bps.store(bps, Ordering::SeqCst);
+    }
+
     /// `n` byte hakkı ister; kredi yetmiyorsa refill hızına kadar uyur.
     /// `cancel` tetiklenirse hakkı beklemeden (kısmi) döner — çağıran taraf
     /// cancel sonrası yazmayı bırakır.
     pub async fn acquire(&self, n: u64, cancel: &CancellationToken) {
-        if self.capacity_bps == 0 || n == 0 {
+        if n == 0 || self.capacity_bps() == 0 {
             return;
         }
         let _queued = self.gate.lock().await;
@@ -49,13 +55,16 @@ impl ByteBudget {
             if cancel.is_cancelled() {
                 return;
             }
+            let capacity = self.capacity_bps();
+            if capacity == 0 {
+                return;
+            }
             // Refill: son bakıştan beri geçen süre * kapasite.
             let mut tokens = self.tokens.lock().await;
             let now = now_ms();
             let last = self.last_refill_ms.swap(now, Ordering::SeqCst);
             let elapsed_s = now.saturating_sub(last) as f64 / 1000.0;
-            *tokens = (*tokens + elapsed_s * self.capacity_bps as f64)
-                .min(self.capacity_bps as f64 * 2.0); // burst tavanı: 2 saniyelik kredi
+            *tokens = (*tokens + elapsed_s * capacity as f64).min(capacity as f64 * 2.0); // burst tavanı: 2 saniyelik kredi
             let take = remaining.min(*tokens);
             *tokens -= take;
             remaining -= take;
@@ -63,7 +72,7 @@ impl ByteBudget {
                 break;
             }
             // Ne kadar uyumalı: kalan byte / hız.
-            let sleep_ms = (remaining / self.capacity_bps as f64 * 1000.0).ceil() as u64;
+            let sleep_ms = (remaining / capacity as f64 * 1000.0).ceil() as u64;
             drop(tokens);
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_millis(sleep_ms.clamp(1, 2000))) => {}
@@ -74,7 +83,7 @@ impl ByteBudget {
 
     /// Test/ayar için: saniyede byte kapasitesi.
     pub fn capacity_bps(&self) -> u64 {
-        self.capacity_bps
+        self.capacity_bps.load(Ordering::SeqCst)
     }
 }
 

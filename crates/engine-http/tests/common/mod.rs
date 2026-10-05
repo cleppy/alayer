@@ -16,7 +16,9 @@ pub async fn spawn_range_server(body: Vec<u8>, etag: &str) -> RangeServer {
     let etag_c = etag.clone();
     tokio::spawn(async move {
         loop {
-            let Ok((sock, _)) = listener.accept().await else { break };
+            let Ok((sock, _)) = listener.accept().await else {
+                break;
+            };
             let payload = payload.clone();
             let etag = etag_c.clone();
             tokio::spawn(async move { serve_one(sock, &payload, &etag).await });
@@ -42,7 +44,10 @@ async fn serve_one(sock: tokio::net::TcpStream, body: &[u8], etag: &str) {
         if let Some(v) = lower.strip_prefix("range:") {
             range = parse_range(v.trim());
         }
-        if let Some(v) = line.strip_prefix("If-Range:").or_else(|| line.strip_prefix("if-range:")) {
+        if let Some(v) = line
+            .strip_prefix("If-Range:")
+            .or_else(|| line.strip_prefix("if-range:"))
+        {
             if_range = Some(v.trim().trim_end_matches('\r').to_string());
         }
     }
@@ -58,7 +63,9 @@ async fn serve_one(sock: tokio::net::TcpStream, body: &[u8], etag: &str) {
 
     if range_honored {
         let (start, end) = range.unwrap();
-        let end = end.unwrap_or(body.len() as u64 - 1).min(body.len() as u64 - 1);
+        let end = end
+            .unwrap_or(body.len() as u64 - 1)
+            .min(body.len() as u64 - 1);
         let start = start.min(end);
         let slice = &body[start as usize..=end as usize];
         let head = format!(

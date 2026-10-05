@@ -23,9 +23,15 @@ pub struct ProbeResult {
 
 pub enum ProbeFail {
     /// Geçici: 5xx veya bağlantı/timeout. Retry edilir.
-    Transient { status: Option<u16>, message: String },
+    Transient {
+        status: Option<u16>,
+        message: String,
+    },
     /// Kalıcı HTTP (4xx, 403/410 hariç).
-    Http { status: u16, message: String },
+    Http {
+        status: u16,
+        message: String,
+    },
     Io(String),
 }
 
@@ -46,8 +52,13 @@ fn parse_total(content_range: &str) -> Option<u64> {
     total.parse().ok()
 }
 
-pub async fn probe(client: &reqwest::Client, spec: &HttpTaskSpec) -> Result<ProbeResult, ProbeFail> {
-    let mut req = client.get(&spec.url).header(reqwest::header::RANGE, "bytes=0-0");
+pub async fn probe(
+    client: &reqwest::Client,
+    spec: &HttpTaskSpec,
+) -> Result<ProbeResult, ProbeFail> {
+    let mut req = client
+        .get(&spec.url)
+        .header(reqwest::header::RANGE, "bytes=0-0");
     req = apply_headers(req, &spec.headers);
     let resp = match req.send().await {
         Ok(r) => r,
@@ -78,7 +89,9 @@ pub async fn probe(client: &reqwest::Client, spec: &HttpTaskSpec) -> Result<Prob
     }
 
     if status == StatusCode::PARTIAL_CONTENT {
-        let total = header_str(&resp, "content-range").as_deref().and_then(parse_total);
+        let total = header_str(&resp, "content-range")
+            .as_deref()
+            .and_then(parse_total);
         // 206 ama toplam yok → segmentlenemez, tek akışa düş.
         let range_ok = total.is_some();
         return Ok(ProbeResult {

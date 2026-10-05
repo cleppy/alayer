@@ -65,7 +65,11 @@ impl EventSink for StdoutSink {
                 *self.exit_ok.lock().unwrap_or_else(|e| e.into_inner()) = Some(false);
                 self.done.notify_waiters();
             }
-            CoreEvent::TaskAdded { task_id, kind, source } => {
+            CoreEvent::TaskAdded {
+                task_id,
+                kind,
+                source,
+            } => {
                 eprintln!("added {task_id} {kind:?} via {source:?}");
             }
             CoreEvent::TaskRemoved { task_id } => eprintln!("removed {task_id}"),

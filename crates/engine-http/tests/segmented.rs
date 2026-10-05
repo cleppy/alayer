@@ -29,9 +29,7 @@ fn spec(url: String, dest: PathBuf, segments: usize) -> HttpTaskSpec {
     }
 }
 
-async fn run(
-    spec: HttpTaskSpec,
-) -> (Result<(), layer_engine_api::EngineError>, Vec<EngineEvent>) {
+async fn run(spec: HttpTaskSpec) -> (Result<(), layer_engine_api::EngineError>, Vec<EngineEvent>) {
     let engine = ReqwestHttpEngine::for_tests();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let h = tokio::spawn(async move { engine.run(spec, tx, CancellationToken::new(), None).await });
@@ -55,12 +53,7 @@ async fn four_segments_byte_exact() {
     let srv = spawn_range_server(body.clone(), "\"e1\"").await;
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("dl");
-    let (res, events) = run(spec(
-        format!("http://{}/f.bin", srv.addr),
-        dest.clone(),
-        4,
-    ))
-    .await;
+    let (res, events) = run(spec(format!("http://{}/f.bin", srv.addr), dest.clone(), 4)).await;
     res.unwrap();
     let segs = plan(&events).expect("SegmentPlan");
     assert_eq!(segs.len(), 4, "1MB / 256KB min = 4");
@@ -77,7 +70,11 @@ async fn small_file_fewer_segments() {
     let dest = dir.path().join("dl");
     let (_, events) = run(spec(format!("http://{}/f.bin", srv.addr), dest.clone(), 8)).await;
     let segs = plan(&events).expect("plan");
-    assert!(segs.len() < 8, "100KB < 8*256KB, segment sayısı düşmeli: {}", segs.len());
+    assert!(
+        segs.len() < 8,
+        "100KB < 8*256KB, segment sayısı düşmeli: {}",
+        segs.len()
+    );
     assert_eq!(std::fs::read(dest.join("f.bin")).unwrap(), body);
 }
 
@@ -99,8 +96,18 @@ async fn resume_requests_only_missing_bytes() {
         last_modified: None,
         total_bytes: Some(body.len() as u64),
         segments: vec![
-            SegmentProgress { idx: 0, start: 0, end: 399_999, downloaded: 400_000 },
-            SegmentProgress { idx: 1, start: 400_000, end: 799_999, downloaded: 0 },
+            SegmentProgress {
+                idx: 0,
+                start: 0,
+                end: 399_999,
+                downloaded: 400_000,
+            },
+            SegmentProgress {
+                idx: 1,
+                start: 400_000,
+                end: 799_999,
+                downloaded: 0,
+            },
         ],
     });
     let (res, events) = run(spec).await;
@@ -125,14 +132,26 @@ async fn if_range_mismatch_is_conflict() {
         last_modified: None,
         total_bytes: Some(body.len() as u64),
         segments: vec![
-            SegmentProgress { idx: 0, start: 0, end: 299_999, downloaded: 100 },
-            SegmentProgress { idx: 1, start: 300_000, end: 599_999, downloaded: 0 },
+            SegmentProgress {
+                idx: 0,
+                start: 0,
+                end: 299_999,
+                downloaded: 100,
+            },
+            SegmentProgress {
+                idx: 1,
+                start: 300_000,
+                end: 599_999,
+                downloaded: 0,
+            },
         ],
     });
     let (res, events) = run(spec).await;
     res.unwrap();
     assert!(
-        events.iter().any(|e| matches!(e, EngineEvent::ConflictDetected)),
+        events
+            .iter()
+            .any(|e| matches!(e, EngineEvent::ConflictDetected)),
         "If-Range uyuşmazlığı Conflict olmalı"
     );
     assert!(!dest.join("f.bin").exists(), "çakışmada final yazılmamalı");
@@ -145,18 +164,25 @@ async fn segment_403_need_reresolve() {
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         loop {
-            let Ok((sock, _)) = listener.accept().await else { break };
+            let Ok((sock, _)) = listener.accept().await else {
+                break;
+            };
             tokio::spawn(async move {
                 let (r, mut w) = tokio::io::split(sock);
                 let mut reader = tokio::io::BufReader::new(r);
                 let mut is_probe = false;
                 loop {
                     let mut line = String::new();
-                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 { return; }
-                    if line.to_ascii_lowercase().starts_with("range:") && line.contains("bytes=0-0") {
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if line.to_ascii_lowercase().starts_with("range:") && line.contains("bytes=0-0")
+                    {
                         is_probe = true;
                     }
-                    if line == "\r\n" { break; }
+                    if line == "\r\n" {
+                        break;
+                    }
                 }
                 if is_probe {
                     let head = b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/1000000\r\nContent-Length: 1\r\nETag: \"e\"\r\nConnection: close\r\n\r\n";
@@ -178,7 +204,9 @@ async fn segment_403_need_reresolve() {
     .await;
     res.unwrap();
     assert!(
-        events.iter().any(|e| matches!(e, EngineEvent::NeedReResolve)),
+        events
+            .iter()
+            .any(|e| matches!(e, EngineEvent::NeedReResolve)),
         "segment 403 → NeedReResolve"
     );
     assert!(!dir.path().join("dl/f.bin").exists());

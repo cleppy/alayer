@@ -42,7 +42,10 @@ impl QueuePolicy {
 
     /// Aynı anda tek medya çözümü. HTTP limiti bunu saymaz.
     pub fn next_media(&self, tasks: &[Task]) -> Option<TaskId> {
-        if tasks.iter().any(|t| t.kind == TaskKind::Media && t.is_active()) {
+        if tasks
+            .iter()
+            .any(|t| t.kind == TaskKind::Media && t.is_active())
+        {
             return None;
         }
         tasks

@@ -2,12 +2,17 @@
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { bytes } from "./lib/format";
   import Strip from "./lib/Strip.svelte";
   import {
     addMedia,
     addTorrent,
     addUrl,
+    confirmTorrentFiles,
+    globalLimitMb,
     openDownloads,
+    setGlobalLimitMb,
+    setTaskLimitMb,
     cancel,
     inApp,
     listTasks,
@@ -37,6 +42,9 @@
   let settingsOpen = $state(false);
   let shape = $state<"sharp" | "soft">("sharp");
   let accent = $state(localStorage.getItem("layer-accent") || "blue");
+  let globalLimit = $state("");
+  let notice = $state("");
+  let filePick = $state<{ id: string; files: { index: number; name: string; length: number; on: boolean }[] } | null>(null);
 
   const shown = $derived(
     tasks.filter((task) => {
@@ -91,6 +99,17 @@
       );
       return;
     }
+    if (event.type === "state" && event.state === "completed") {
+      const task = tasks.find((item) => item.id === event.task_id);
+      notice = `${task?.file_name || "Download"} finished`;
+    }
+    if (event.type === "files") {
+      filePick = {
+        id: event.task_id,
+        files: event.files.map((file) => ({ ...file, on: true })),
+      };
+      return;
+    }
     if (event.type === "removed") {
       tasks = tasks.filter((task) => task.id !== event.task_id);
       return;
@@ -121,6 +140,11 @@
     refresh().catch((err) => {
       error = String(err);
     });
+    globalLimitMb()
+      .then((mbps) => {
+        if (mbps > 0) globalLimit = String(Math.round(mbps * 10) / 10);
+      })
+      .catch(() => {});
     let stop = false;
     let unlisten: (() => void) | undefined;
     let undrop: (() => void) | undefined;
@@ -207,6 +231,57 @@
     if (typeof selected === "string") await addPath(selected);
   }
 
+  async function saveGlobalLimit() {
+    const mbps = Number(globalLimit);
+    error = "";
+    try {
+      await setGlobalLimitMb(Number.isFinite(mbps) ? mbps : 0);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  async function saveTaskLimit(id: string, raw: string) {
+    const mbps = Number(raw);
+    try {
+      await setTaskLimitMb(id, Number.isFinite(mbps) ? mbps : 0);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  function toggleFile(index: number) {
+    if (!filePick) return;
+    filePick = {
+      ...filePick,
+      files: filePick.files.map((file) =>
+        file.index === index ? { ...file, on: !file.on } : file,
+      ),
+    };
+  }
+
+  async function closeFilePick() {
+    const id = filePick?.id;
+    filePick = null;
+    if (id) await run(pause, id);
+  }
+
+  async function startSelectedFiles() {
+    if (!filePick) return;
+    const indices = filePick.files.filter((file) => file.on).map((file) => file.index);
+    if (indices.length === 0) {
+      error = "Select at least one file.";
+      return;
+    }
+    const id = filePick.id;
+    filePick = null;
+    try {
+      await confirmTorrentFiles(id, indices);
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
   async function run(op: (id: string) => Promise<void>, id: string) {
     error = "";
     try {
@@ -229,6 +304,11 @@
           <div class="shapes">
             <button type="button" class="shape" class:on={shape === "sharp"} onclick={() => setShape("sharp")}>Sharp</button>
             <button type="button" class="shape" class:on={shape === "soft"} onclick={() => setShape("soft")}>Soft</button>
+          </div>
+          <p>Speed cap MB/s</p>
+          <div class="shapes">
+            <input class="limit" bind:value={globalLimit} placeholder="0 = unlimited" />
+            <button type="button" onclick={saveGlobalLimit}>Save</button>
           </div>
           <p>Color</p>
           <div class="swatches">
@@ -288,6 +368,9 @@
     </section>
   {/if}
 
+  {#if notice}
+    <p class="notice" role="status">{notice}</p>
+  {/if}
   {#if error}
     <p class="banner" role="alert">{error}</p>
   {/if}
@@ -305,9 +388,29 @@
         onPause={(id) => run(pause, id)}
         onResume={(id) => run(resume, id)}
         onCancel={(id) => run(cancel, id)}
+        onLimit={(id, raw) => saveTaskLimit(id, raw)}
       />
     {/each}
   </section>
+
+  {#if filePick}
+    <section class="deck" aria-label="Torrent files">
+      <div class="deck-head">
+        <h2>Choose files</h2>
+        <button type="button" class="quiet" onclick={closeFilePick}>Close</button>
+      </div>
+      <div class="file-list">
+        {#each filePick.files as file (file.index)}
+          <label>
+            <input type="checkbox" checked={file.on} onchange={() => toggleFile(file.index)} />
+            <span>{file.name}</span>
+            <span class="dim">{bytes(file.length)}</span>
+          </label>
+        {/each}
+      </div>
+      <button type="button" class="go" onclick={startSelectedFiles}>Start selected</button>
+    </section>
+  {/if}
 
   {#if dragging}
     <div class="drop">Drop the torrent file</div>

@@ -16,6 +16,10 @@ use tokio_util::sync::CancellationToken;
 
 /// Ayar anahtarı: görev başına varsayılan segment sayısı.
 const SETTING_MAX_SEGMENTS: &str = "max_segments";
+
+fn torrent_files_key(id: &str) -> String {
+    format!("torrent_files:{id}")
+}
 const DEFAULT_MAX_SEGMENTS: usize = 8;
 
 struct Inner {
@@ -27,8 +31,8 @@ struct Inner {
     running: Mutex<HashMap<TaskId, CancellationToken>>,
     /// Kuyrukta değişiklik olduğunda pump'ı uyandırır (notify_one: permit birikir).
     notify: Arc<Notify>,
-    /// Tüm görevlerin paylaştığı hız tavanı. `None` = sınırsız.
-    /// Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
+    /// Tüm görevlerin paylaştığı hız tavanı. Kapasite `0` = sınırsız.
+    /// Aynı `Arc` dispatch'te kopyalanır; `set_capacity` çalışan HTTP'ye de yansır.
     global_limit: Mutex<Option<Arc<ByteBudget>>>,
     media: Mutex<Option<Arc<dyn layer_engine_api::MediaResolver>>>,
     torrent: Mutex<Option<Arc<dyn layer_engine_api::TorrentEngine>>>,
@@ -73,7 +77,36 @@ impl Inner {
             old,
             new: to,
             failure: task.failure.clone().filter(|_| to == TaskState::Failed),
+            file_name: task.file_name.clone(),
         });
+    }
+
+    fn torrent_selection(&self, id: &str) -> Option<Vec<u32>> {
+        let raw = self.db.get_setting(&torrent_files_key(id)).ok().flatten()?;
+        let files: Vec<u32> = serde_json::from_str(&raw).ok()?;
+        (!files.is_empty()).then_some(files)
+    }
+
+    fn resume_ids(&self) -> Vec<String> {
+        self.db
+            .get_setting("resume_on_start")
+            .ok()
+            .flatten()
+            .and_then(|raw| serde_json::from_str(&raw).ok())
+            .unwrap_or_default()
+    }
+
+    fn effective_limit(&self, task_limit: Option<u64>) -> Option<u64> {
+        let global = self
+            .global_limit
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .map(|b| b.capacity_bps());
+        match (task_limit.filter(|n| *n > 0), global.filter(|n| *n > 0)) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        }
     }
 
     fn max_segments(&self) -> usize {
@@ -137,7 +170,11 @@ impl Inner {
         let engine = self.http.clone();
         let run_cancel = cancel.clone();
         let run_id = id.clone();
-        let global = self.global_limit.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let global = self
+            .global_limit
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         tokio::spawn(async move {
             if let Err(e) = engine.run(spec, tx.clone(), run_cancel, global).await {
                 tracing::error!(task = %run_id, "engine hatası: {e}");
@@ -152,11 +189,7 @@ impl Inner {
     }
 
     async fn dispatch_media(self: &Arc<Self>, id: TaskId) -> Result<(), CoreError> {
-        let resolver = self
-            .media
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone();
+        let resolver = self.media.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let Some(resolver) = resolver else {
             return Ok(());
         };
@@ -177,6 +210,7 @@ impl Inner {
             dest_dir: t.dest_dir.clone(),
             format: t.resolver_ctx.as_ref().map(|c| c.format_id.clone()),
             audio_format: t.resolver_ctx.as_ref().and_then(|c| c.audio_format.clone()),
+            speed_limit_bps: self.effective_limit(t.speed_limit_bps),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
@@ -218,6 +252,8 @@ impl Inner {
             task_id: t.id.clone(),
             source: t.url.clone(),
             dest_dir: t.dest_dir.clone(),
+            speed_limit_bps: self.effective_limit(t.speed_limit_bps),
+            selected_files: self.torrent_selection(&t.id),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
@@ -306,16 +342,22 @@ async fn consume_engine_events(
                 }
             }
             EngineEvent::Progress(progress) => {
-                if let Err(e) = inner.db.set_progress(
-                    &task_id,
-                    progress.downloaded_bytes,
-                    progress.total_bytes,
-                ) {
+                if let Err(e) =
+                    inner
+                        .db
+                        .set_progress(&task_id, progress.downloaded_bytes, progress.total_bytes)
+                {
                     tracing::error!(task = %task_id, "ilerleme yazılamadı: {e}");
                 }
                 inner.emit(CoreEvent::Progress {
                     task_id: task_id.clone(),
                     progress,
+                });
+            }
+            EngineEvent::TorrentFiles { files } => {
+                inner.emit(CoreEvent::TorrentFiles {
+                    task_id: task_id.clone(),
+                    files,
                 });
             }
             EngineEvent::Named { file_name } => {
@@ -364,7 +406,11 @@ async fn consume_engine_events(
             EngineEvent::NeedReResolve => {
                 // M1: resolver yok → dürüst köprü. M4'te MediaResolver::refresh
                 // ile aynı format_id için tek yeniden çözüm yapılacak.
-                inner.set_state(&mut t, TaskState::Failed, Some(FailureReason::ResolverRequired));
+                inner.set_state(
+                    &mut t,
+                    TaskState::Failed,
+                    Some(FailureReason::ResolverRequired),
+                );
             }
         }
     }
@@ -396,7 +442,11 @@ async fn pump_loop(inner: Arc<Inner>) {
                 }
                 continue;
             }
-            let has_media = inner.media.lock().unwrap_or_else(|e| e.into_inner()).is_some();
+            let has_media = inner
+                .media
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_some();
             if has_media {
                 if let Some(id) = inner.policy.next_media(&tasks) {
                     if let Err(e) = inner.dispatch_media(id).await {
@@ -445,7 +495,7 @@ impl TaskManager {
                 policy,
                 running: Mutex::new(HashMap::new()),
                 notify: Arc::new(Notify::new()),
-                global_limit: Mutex::new(None),
+                global_limit: Mutex::new(Some(Arc::new(ByteBudget::new(0)))),
                 media: Mutex::new(None),
                 torrent: Mutex::new(None),
                 shutdown: CancellationToken::new(),
@@ -465,18 +515,60 @@ impl TaskManager {
         *self.inner.media.lock().unwrap_or_else(|e| e.into_inner()) = Some(resolver);
     }
 
-    /// Tüm görevlerin paylaştığı hız tavanı. `None` kaldırır.
-    /// Çalışan görev bir sonraki chunk'ta yeni bütçeyi görmez — limit
-    /// dispatch anında kopyalanır; canlı güncelleme M2 ayarlar UI'ı ile.
+    /// Tüm görevlerin paylaştığı hız tavanı. `None` veya `0` kaldırır.
+    /// HTTP çalışan görev bir sonraki chunk'ta yeni hızı görür.
     pub fn set_global_limit(&self, bps: Option<u64>) {
-        let budget = bps.filter(|n| *n > 0).map(|n| Arc::new(ByteBudget::new(n)));
-        *self.inner.global_limit.lock().unwrap_or_else(|e| e.into_inner()) = budget;
+        let bps = bps.filter(|n| *n > 0).unwrap_or(0);
+        let guard = self
+            .inner
+            .global_limit
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(budget) = guard.as_ref() {
+            budget.set_capacity(bps);
+        }
+        let _ = self
+            .inner
+            .db
+            .set_setting("global_limit_bps", &bps.to_string());
     }
 
-    /// Çökme kurtarması (Downloading → Paused) + pump'ı başlatır. Idempotent.
+    pub fn global_limit_bps(&self) -> Option<u64> {
+        self.inner
+            .global_limit
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .map(|b| b.capacity_bps())
+            .filter(|n| *n > 0)
+    }
+
+    /// Seçilen torrent dosyaları. Sonraki açılışta seçim penceresi tekrar açılmaz.
+    pub fn remember_torrent_files(&self, id: &str, indices: &[u32]) -> Result<(), CoreError> {
+        let json = serde_json::to_string(indices).map_err(|e| CoreError::Engine(e.to_string()))?;
+        self.inner.db.set_setting(&torrent_files_key(id), &json)?;
+        Ok(())
+    }
+
+    /// Çöküşte yarım video/torrent yeniden kuyruğa girer. Elle duraklatılan kalır.
+    /// HTTP çöküşü eski kural: Paused, kendiliğinden başlamaz.
     pub async fn start(&self) -> Result<(), CoreError> {
+        let marked = self.inner.resume_ids();
+        let _ = self.inner.db.set_setting("resume_on_start", "[]");
         for mut t in self.inner.db.list_tasks()? {
-            if t.state == TaskState::Downloading {
+            if self.inner.lock_running().contains_key(&t.id) {
+                continue;
+            }
+            let interrupted = t.state == TaskState::Downloading;
+            let marked_resume = marked.iter().any(|id| id == &t.id);
+            let auto = matches!(t.kind, TaskKind::Media | TaskKind::Torrent);
+            if auto && interrupted {
+                // Downloading → Queued yasak; Paused üzerinden kuyruğa alınır.
+                self.inner.set_state(&mut t, TaskState::Paused, None);
+                self.inner.set_state(&mut t, TaskState::Queued, None);
+            } else if auto && marked_resume && t.state == TaskState::Paused {
+                self.inner.set_state(&mut t, TaskState::Queued, None);
+            } else if interrupted {
                 self.inner.set_state(&mut t, TaskState::Paused, None);
             }
         }
@@ -603,11 +695,7 @@ impl TaskManager {
             .ok_or_else(|| CoreError::NotFound(id.to_string()))?;
         match t.state {
             TaskState::Downloading | TaskState::Queued => {}
-            s => {
-                return Err(CoreError::InvalidState(format!(
-                    "{s:?} duraklatılamaz"
-                )))
-            }
+            s => return Err(CoreError::InvalidState(format!("{s:?} duraklatılamaz"))),
         }
         self.inner.set_state(&mut t, TaskState::Paused, None);
         if let Some(token) = self.inner.lock_running().remove(id) {
@@ -655,6 +743,7 @@ impl TaskManager {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => tracing::warn!(task = %id, ".part silinemedi: {e}"),
         }
+        let _ = self.inner.db.set_setting(&torrent_files_key(id), "[]");
         self.inner.db.delete_task(id)?;
         self.inner.emit(CoreEvent::TaskRemoved {
             task_id: id.to_string(),
@@ -665,11 +754,7 @@ impl TaskManager {
 
     /// Görev hız limiti. M1: kalıcı ayar, çalışan göreve bir sonraki
     /// dispatch'te uygulanır (canlı güncelleme M2 ayarlar UI'ı ile).
-    pub async fn set_task_speed_limit(
-        &self,
-        id: &str,
-        bps: Option<u64>,
-    ) -> Result<(), CoreError> {
+    pub async fn set_task_speed_limit(&self, id: &str, bps: Option<u64>) -> Result<(), CoreError> {
         let mut t = self
             .inner
             .db
@@ -681,25 +766,37 @@ impl TaskManager {
     }
 
     /// Çalışan görevleri Paused'a çeker, pump'ı durdurur.
+    /// Video ve torrent kimlikleri `resume_on_start`'a yazılır; sonraki açılış sürdürür.
+    /// Sıra: önce DB, sonra cancel — tüketici Failed yazmasın.
     pub async fn shutdown(&self) {
         self.inner.shutdown.cancel();
-        if let Some(h) = self.inner.pump.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        if let Some(h) = self
+            .inner
+            .pump
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+        {
             h.abort();
         }
-        let ids: Vec<TaskId> = self
-            .inner
-            .lock_running()
-            .drain()
-            .map(|(id, token)| {
-                token.cancel();
-                id
-            })
-            .collect();
-        for id in ids {
-            if let Ok(Some(mut t)) = self.inner.db.load_task(&id) {
+        let ids: Vec<TaskId> = self.inner.lock_running().keys().cloned().collect();
+        let mut resume = Vec::new();
+        for id in &ids {
+            if let Ok(Some(mut t)) = self.inner.db.load_task(id) {
                 if t.state == TaskState::Downloading {
+                    if matches!(t.kind, TaskKind::Media | TaskKind::Torrent) {
+                        resume.push(id.clone());
+                    }
                     self.inner.set_state(&mut t, TaskState::Paused, None);
                 }
+            }
+        }
+        if let Ok(json) = serde_json::to_string(&resume) {
+            let _ = self.inner.db.set_setting("resume_on_start", &json);
+        }
+        for id in ids {
+            if let Some(token) = self.inner.lock_running().remove(&id) {
+                token.cancel();
             }
         }
     }
@@ -719,7 +816,10 @@ impl TaskManager {
                 if task.state == TaskState::Completed {
                     task.total_bytes = Some(on_disk);
                 }
-                let _ = self.inner.db.set_progress(&task.id, on_disk, task.total_bytes);
+                let _ = self
+                    .inner
+                    .db
+                    .set_progress(&task.id, on_disk, task.total_bytes);
             }
         }
         Ok(tasks)
@@ -738,7 +838,11 @@ fn bytes_on_disk(task: &Task) -> u64 {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             let matches = name.starts_with(&prefix) || name.starts_with(&task.file_name);
-            if !matches || name.ends_with(".ytdl") || name.ends_with(".path") || name.ends_with(".aria2") {
+            if !matches
+                || name.ends_with(".ytdl")
+                || name.ends_with(".path")
+                || name.ends_with(".aria2")
+            {
                 continue;
             }
             if let Ok(meta) = entry.metadata() {
@@ -923,12 +1027,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = Arc::new(Db::open(&dir.path().join("layer.db")).unwrap());
         let sink = RecordingSink::default();
-        let manager = TaskManager::new(
-            db.clone(),
-            Arc::new(engine),
-            Arc::new(sink.clone()),
-            policy,
-        );
+        let manager =
+            TaskManager::new(db.clone(), Arc::new(engine), Arc::new(sink.clone()), policy);
         Ctx {
             manager,
             db,
@@ -1005,7 +1105,8 @@ mod tests {
         let ctx = setup(engine, QueuePolicy::default());
         let media_calls = Arc::new(Mutex::new(Vec::<String>::new()));
         let seen = media_calls.clone();
-        ctx.manager.set_media_resolver(Arc::new(FakeMedia { calls: seen }));
+        ctx.manager
+            .set_media_resolver(Arc::new(FakeMedia { calls: seen }));
         ctx.manager.start().await.unwrap();
         let id = ctx
             .manager
@@ -1018,7 +1119,10 @@ mod tests {
             .unwrap();
         wait_for(|| state_of(&ctx, &id) == Some(TaskState::Completed)).await;
         assert_eq!(http_calls.lock().unwrap().len(), 0);
-        assert_eq!(media_calls.lock().unwrap().as_slice(), ["https://youtu.be/RRuqmvda7w8"]);
+        assert_eq!(
+            media_calls.lock().unwrap().as_slice(),
+            ["https://youtu.be/RRuqmvda7w8"]
+        );
     }
 
     #[tokio::test]
@@ -1090,8 +1194,12 @@ mod tests {
         assert!(!t.unresumable);
         assert_eq!(t.downloaded_bytes, 1000);
 
-        assert!(ctx.sink.has_transition(&id, TaskState::Queued, TaskState::Downloading));
-        assert!(ctx.sink.has_transition(&id, TaskState::Downloading, TaskState::Completed));
+        assert!(ctx
+            .sink
+            .has_transition(&id, TaskState::Queued, TaskState::Downloading));
+        assert!(ctx
+            .sink
+            .has_transition(&id, TaskState::Downloading, TaskState::Completed));
         assert_eq!(ctx.sink.progress_count(&id), 1);
 
         let spec = calls.lock().unwrap()[0].clone();
@@ -1148,7 +1256,9 @@ mod tests {
 
         ctx.manager.pause(&id).await.unwrap();
         wait_for(|| state_of(&ctx, &id) == Some(TaskState::Paused)).await;
-        assert!(ctx.sink.has_transition(&id, TaskState::Downloading, TaskState::Paused));
+        assert!(ctx
+            .sink
+            .has_transition(&id, TaskState::Downloading, TaskState::Paused));
 
         ctx.manager.resume(&id).await.unwrap();
         wait_for(|| calls.lock().unwrap().len() == 2).await;
@@ -1159,7 +1269,9 @@ mod tests {
         assert_eq!(resume.total_bytes, Some(2000));
         assert_eq!(resume.segments.len(), 2);
         assert_eq!(resume.segments[0].downloaded, 400);
-        assert!(ctx.sink.has_transition(&id, TaskState::Paused, TaskState::Queued));
+        assert!(ctx
+            .sink
+            .has_transition(&id, TaskState::Paused, TaskState::Queued));
     }
 
     #[tokio::test]
@@ -1237,7 +1349,9 @@ mod tests {
         ctx.manager.retry(&id).await.unwrap();
         wait_for(|| calls.lock().unwrap().len() == 2).await;
         wait_for(|| state_of(&ctx, &id) == Some(TaskState::Failed)).await;
-        assert!(ctx.sink.has_transition(&id, TaskState::Failed, TaskState::Queued));
+        assert!(ctx
+            .sink
+            .has_transition(&id, TaskState::Failed, TaskState::Queued));
     }
 
     #[tokio::test]
@@ -1289,6 +1403,33 @@ mod tests {
         })
         .await;
         assert!(sink.has_transition(&stranded.id, TaskState::Downloading, TaskState::Paused));
+    }
+
+    #[tokio::test]
+    async fn start_requeues_interrupted_media_not_user_pause() {
+        let ctx = setup(FakeEngine::scripted(vec![]), QueuePolicy::default());
+        let mut crashed = Task::new_media("https://youtu.be/crash".into(), ctx.dest.clone());
+        crashed.transition(TaskState::Downloading).unwrap();
+        ctx.db.upsert_task(&crashed).unwrap();
+
+        let mut user_paused = Task::new_torrent("magnet:?xt=urn:btih:abc".into(), ctx.dest.clone());
+        user_paused.transition(TaskState::Paused).unwrap();
+        ctx.db.upsert_task(&user_paused).unwrap();
+
+        let mut closed = Task::new_media("https://youtu.be/closed".into(), ctx.dest.clone());
+        closed.transition(TaskState::Paused).unwrap();
+        ctx.db.upsert_task(&closed).unwrap();
+        ctx.db
+            .set_setting(
+                "resume_on_start",
+                &serde_json::to_string(&vec![closed.id.clone()]).unwrap(),
+            )
+            .unwrap();
+
+        ctx.manager.start().await.unwrap();
+        wait_for(|| state_of(&ctx, &crashed.id) == Some(TaskState::Queued)).await;
+        assert_eq!(state_of(&ctx, &user_paused.id), Some(TaskState::Paused));
+        assert_eq!(state_of(&ctx, &closed.id), Some(TaskState::Queued));
     }
 
     #[tokio::test]
@@ -1371,7 +1512,11 @@ mod tests {
         // pump öldü: yeni intake dispatch edilmez
         let id2 = ctx
             .manager
-            .intake(IntakeSource::Ui, "https://e.com/second".into(), ctx.dest.clone())
+            .intake(
+                IntakeSource::Ui,
+                "https://e.com/second".into(),
+                ctx.dest.clone(),
+            )
             .await
             .unwrap();
         tokio::time::sleep(Duration::from_millis(100)).await;

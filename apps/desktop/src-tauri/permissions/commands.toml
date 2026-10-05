@@ -39,6 +39,26 @@ description = "Görevi sürdürür."
 commands.allow = ["resume"]
 
 [[permission]]
+identifier = "allow-confirm-torrent-files"
+description = "Starts the selected torrent files."
+commands.allow = ["confirm_torrent_files"]
+
+[[permission]]
+identifier = "allow-global-limit-mb"
+description = "Reads the global speed cap."
+commands.allow = ["global_limit_mb"]
+
+[[permission]]
+identifier = "allow-set-global-limit-mb"
+description = "Sets the global speed cap."
+commands.allow = ["set_global_limit_mb"]
+
+[[permission]]
+identifier = "allow-set-task-limit-mb"
+description = "Sets one download's speed cap."
+commands.allow = ["set_task_limit_mb"]
+
+[[permission]]
 identifier = "allow-cancel"
 description = "Görevi iptal eder."
 commands.allow = ["cancel"]

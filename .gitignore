@@ -21,3 +21,4 @@ apps/desktop/src-tauri/target/
 # IDE
 .idea/
 .vscode/
+apps/desktop/tauri-dev.log

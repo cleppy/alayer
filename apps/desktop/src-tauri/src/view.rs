@@ -13,6 +13,7 @@ pub struct TaskView {
     pub total_bytes: Option<u64>,
     pub failure: Option<String>,
     pub unresumable: bool,
+    pub speed_limit_bps: Option<u64>,
 }
 
 fn tag<T: serde::Serialize>(value: &T) -> String {
@@ -34,6 +35,7 @@ pub fn to_view(task: &Task) -> TaskView {
         total_bytes: task.total_bytes,
         failure: task.failure.as_ref().map(|f| f.display()),
         unresumable: task.unresumable,
+        speed_limit_bps: task.speed_limit_bps,
     }
 }
 

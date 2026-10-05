@@ -15,6 +15,7 @@ export type TaskView = {
   total_bytes: number | null;
   failure: string | null;
   unresumable: boolean;
+  speed_limit_bps: number | null;
 };
 
 export type UiEvent =
@@ -28,7 +29,12 @@ export type UiEvent =
       speed_bps: number;
     }
   | { type: "removed"; task_id: string }
-  | { type: "updated"; task_id: string };
+  | { type: "updated"; task_id: string }
+  | {
+      type: "files";
+      task_id: string;
+      files: { index: number; name: string; length: number }[];
+    };
 
 export function listTasks(): Promise<TaskView[]> {
   return invoke("list_tasks");
@@ -63,6 +69,22 @@ export function addMedia(
 
 export function openDownloads(): Promise<void> {
   return invoke("open_downloads");
+}
+
+export function confirmTorrentFiles(id: string, indices: number[]): Promise<void> {
+  return invoke("confirm_torrent_files", { id, indices });
+}
+
+export function setGlobalLimitMb(mbps: number): Promise<void> {
+  return invoke("set_global_limit_mb", { mbps });
+}
+
+export function globalLimitMb(): Promise<number> {
+  return invoke("global_limit_mb");
+}
+
+export function setTaskLimitMb(id: string, mbps: number): Promise<void> {
+  return invoke("set_task_limit_mb", { id, mbps });
 }
 
 export function addUrl(url: string): Promise<string> {

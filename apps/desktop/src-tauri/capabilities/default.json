@@ -7,6 +7,7 @@
     "core:default",
     "core:event:allow-listen",
     "dialog:default",
+    "notification:default",
     "allow-list-tasks",
     "allow-prepare-download",
     "allow-add-media",
@@ -15,6 +16,10 @@
     "allow-add-torrent",
     "allow-pause",
     "allow-resume",
-    "allow-cancel"
+    "allow-cancel",
+    "allow-confirm-torrent-files",
+    "allow-global-limit-mb",
+    "allow-set-global-limit-mb",
+    "allow-set-task-limit-mb"
   ]
 }

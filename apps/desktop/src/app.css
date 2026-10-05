@@ -95,6 +95,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .filters { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 
 .banner { margin: 0; color: var(--fail); }
+.notice { margin: 0; color: var(--accent); font-weight: 700; }
 .empty { margin: 0; color: var(--muted); }
 
 .layout {
@@ -299,7 +300,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: absolute;
   right: 0;
   top: calc(100% + 0.4rem);
-  width: 240px;
+  width: 280px;
   background: var(--card);
   border: 1px solid var(--line);
   padding: 0.75rem;
@@ -317,6 +318,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   text-transform: uppercase;
 }
 .swatches, .shapes { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.limit {
+  width: 7rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.3rem 0.4rem;
+}
+.file-list { display: flex; flex-direction: column; gap: 0.3rem; max-height: 240px; overflow: auto; }
+.file-list label { display: flex; gap: 0.4rem; align-items: center; }
+.file-list label span:first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dim { color: var(--muted); }
 .swatch, .shape { padding: 0.35rem 0.55rem; font-weight: 700; font-size: 0.78rem; }
 .swatch[data-color="blue"] { color: #2f6dff; }
 .swatch[data-color="red"] { color: #e23b3b; }

@@ -7,8 +7,11 @@ use layer_engine_bridge::{Aria2Engine, YtdlpResolver};
 use layer_engine_http::ReqwestHttpEngine;
 use sink::TauriSink;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
+
+static CLOSING: AtomicBool = AtomicBool::new(false);
 
 pub struct Tools {
     pub ytdlp: Option<PathBuf>,
@@ -18,16 +21,50 @@ pub struct Tools {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
         }))
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if CLOSING.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_close();
+                let window = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    let app = window.app_handle();
+                    if let Some(manager) = app.try_state::<TaskManager>() {
+                        manager.shutdown().await;
+                    }
+                    if let Some(slot) = app.try_state::<Option<Arc<Aria2Engine>>>() {
+                        if let Some(aria) = slot.as_ref() {
+                            aria.save_session().await;
+                        }
+                    }
+                    let _ = window.destroy();
+                });
+            }
+        })
         .setup(|app| {
             let data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data)?;
+            let extra = app
+                .path()
+                .resource_dir()
+                .ok()
+                .into_iter()
+                .collect::<Vec<_>>();
             let db = Arc::new(Db::open(&data.join("layer.db"))?);
+            let saved_limit = db
+                .get_setting("global_limit_bps")
+                .ok()
+                .flatten()
+                .and_then(|raw| raw.parse::<u64>().ok())
+                .filter(|n| *n > 0);
             let sink = Arc::new(TauriSink::new(app.handle().clone()));
             let manager = TaskManager::new(
                 db,
@@ -35,14 +72,24 @@ pub fn run() {
                 sink,
                 QueuePolicy::default(),
             );
-            if let Some(aria) = find_sidecar("aria2c.exe") {
-                let work = data.join("aria2");
-                manager.set_torrent_engine(Arc::new(Aria2Engine::new(aria, work)));
+            if let Some(bps) = saved_limit {
+                manager.set_global_limit(Some(bps));
+            }
+            let aria = find_sidecar("aria2c.exe", &extra)
+                .map(|path| Arc::new(Aria2Engine::new(path, data.join("aria2"))));
+            if let Some(aria) = &aria {
+                manager.set_torrent_engine(aria.clone());
+                if let Some(bps) = saved_limit {
+                    let aria = aria.clone();
+                    tauri::async_runtime::spawn(async move {
+                        aria.set_global_limit(Some(bps)).await;
+                    });
+                }
             } else {
                 eprintln!("aria2c yok: magnet ve torrent kuyrukta bekler");
             }
-            if let Some(ytdlp) = find_sidecar("yt-dlp.exe") {
-                let ffmpeg = find_sidecar("ffmpeg.exe");
+            if let Some(ytdlp) = find_sidecar("yt-dlp.exe", &extra) {
+                let ffmpeg = find_sidecar("ffmpeg.exe", &extra);
                 let node = find_node();
                 manager.set_media_resolver(Arc::new(YtdlpResolver::new(ytdlp, ffmpeg, node)));
             } else {
@@ -55,9 +102,10 @@ pub fn run() {
                 }
             });
             app.manage(Tools {
-                ytdlp: find_sidecar("yt-dlp.exe"),
+                ytdlp: find_sidecar("yt-dlp.exe", &extra),
                 node: find_node(),
             });
+            app.manage(aria);
             app.manage(manager);
             Ok(())
         })
@@ -70,14 +118,22 @@ pub fn run() {
             commands::add_torrent,
             commands::pause,
             commands::resume,
-            commands::cancel
+            commands::cancel,
+            commands::confirm_torrent_files,
+            commands::set_global_limit_mb,
+            commands::global_limit_mb,
+            commands::set_task_limit_mb
         ])
         .run(tauri::generate_context!())
         .expect("layer penceresi açılmadı");
 }
 
-fn find_sidecar(name: &str) -> Option<PathBuf> {
+fn find_sidecar(name: &str, extra: &[PathBuf]) -> Option<PathBuf> {
     let mut dirs = Vec::new();
+    for dir in extra {
+        dirs.push(dir.join("sidecars").join("bin"));
+        dirs.push(dir.clone());
+    }
     if let Ok(dir) = std::env::var("LAYER_SIDECARS") {
         dirs.push(PathBuf::from(dir));
     }

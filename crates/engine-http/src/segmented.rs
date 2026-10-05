@@ -72,15 +72,15 @@ pub async fn run_segmented(
     budgets: &[Arc<ByteBudget>],
     policy: &RetryPolicy,
 ) -> Result<SegmentedOutcome, EngineError> {
-    let total = probe.total_bytes.ok_or_else(|| {
-        EngineError::InvalidSpec("segmented requires known total".into())
-    })?;
+    let total = probe
+        .total_bytes
+        .ok_or_else(|| EngineError::InvalidSpec("segmented requires known total".into()))?;
     std::fs::create_dir_all(&spec.dest_dir)?;
     let final_p = spec.dest_dir.join(&spec.file_name);
     if final_p.exists() {
-        return Ok(SegmentedOutcome::Failed(layer_engine_api::FailureReason::Io(
-            format!("hedef zaten var: {}", final_p.display()),
-        )));
+        return Ok(SegmentedOutcome::Failed(
+            layer_engine_api::FailureReason::Io(format!("hedef zaten var: {}", final_p.display())),
+        ));
     }
     let part = spec.dest_dir.join(format!("{}.part", spec.file_name));
     {
@@ -94,7 +94,10 @@ pub async fn run_segmented(
     let _ = events.send(EngineEvent::SegmentPlan(segments.clone()));
 
     let file = Arc::new(tokio::sync::Mutex::new(
-        tokio::fs::OpenOptions::new().write(true).open(&part).await?,
+        tokio::fs::OpenOptions::new()
+            .write(true)
+            .open(&part)
+            .await?,
     ));
     let stop = Arc::new(AtomicBool::new(false));
     let conflict = Arc::new(AtomicBool::new(false));
@@ -122,8 +125,20 @@ pub async fn run_segmented(
         let fail_msg = fail_msg.clone();
         joins.push(tokio::spawn(async move {
             download_segment(
-                &client, &spec, &probe, seg, &events, &cancel, &budgets, &policy,
-                &file, &stop, &conflict, &expired, &downloaded, &fail_msg,
+                &client,
+                &spec,
+                &probe,
+                seg,
+                &events,
+                &cancel,
+                &budgets,
+                &policy,
+                &file,
+                &stop,
+                &conflict,
+                &expired,
+                &downloaded,
+                &fail_msg,
             )
             .await
         }));
@@ -133,7 +148,12 @@ pub async fn run_segmented(
         let _ = j.await;
     }
 
-    if cancel.is_cancelled() || stop.load(Ordering::SeqCst) && !conflict.load(Ordering::SeqCst) && !expired.load(Ordering::SeqCst) && fail_msg.lock().unwrap().is_none() {
+    if cancel.is_cancelled()
+        || stop.load(Ordering::SeqCst)
+            && !conflict.load(Ordering::SeqCst)
+            && !expired.load(Ordering::SeqCst)
+            && fail_msg.lock().unwrap().is_none()
+    {
         // cancel veya temiz duruş
     }
     if conflict.load(Ordering::SeqCst) {
@@ -153,7 +173,9 @@ pub async fn run_segmented(
 
     drop(file);
     if let Err(e) = std::fs::rename(&part, &final_p) {
-        return Ok(SegmentedOutcome::Failed(layer_engine_api::FailureReason::Io(e.to_string())));
+        return Ok(SegmentedOutcome::Failed(
+            layer_engine_api::FailureReason::Io(e.to_string()),
+        ));
     }
     Ok(SegmentedOutcome::Completed)
 }
@@ -181,15 +203,32 @@ async fn download_segment(
     while got < need && !stop.load(Ordering::SeqCst) && !cancel.is_cancelled() {
         let start = seg.start + got;
         let end = seg.end;
-        match fetch_range(client, spec, probe, start, end, file, cancel, budgets, downloaded_total, events).await {
+        match fetch_range(
+            client,
+            spec,
+            probe,
+            start,
+            end,
+            file,
+            cancel,
+            budgets,
+            downloaded_total,
+            events,
+        )
+        .await
+        {
             Ok(n) => {
                 got += n;
-                let _ = events.send(EngineEvent::SegmentUpdate { idx: seg.idx, downloaded: got });
+                let _ = events.send(EngineEvent::SegmentUpdate {
+                    idx: seg.idx,
+                    downloaded: got,
+                });
                 if n == 0 && got < need {
                     attempt += 1;
                     if attempt >= policy.max_attempts {
                         stop.store(true, Ordering::SeqCst);
-                        *fail_msg.lock().unwrap() = Some(format!("segment {} kısa kapandı", seg.idx));
+                        *fail_msg.lock().unwrap() =
+                            Some(format!("segment {} kısa kapandı", seg.idx));
                         return;
                     }
                     if !sleep_backoff(attempt, policy, cancel).await {
@@ -250,7 +289,10 @@ async fn fetch_range(
         req = req.header(reqwest::header::IF_RANGE, v);
     }
     req = apply_headers(req, &spec.headers);
-    let resp = req.send().await.map_err(|e| SegErr::Transient(e.to_string()))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| SegErr::Transient(e.to_string()))?;
     let status = resp.status();
     if is_expired_url(status) {
         return Err(SegErr::Expired);
@@ -277,12 +319,17 @@ async fn fetch_range(
         }
         {
             let mut f = file.lock().await;
-            f.seek(std::io::SeekFrom::Start(cursor)).await.map_err(|e| SegErr::Transient(e.to_string()))?;
-            f.write_all(&chunk).await.map_err(|e| SegErr::Transient(e.to_string()))?;
+            f.seek(std::io::SeekFrom::Start(cursor))
+                .await
+                .map_err(|e| SegErr::Transient(e.to_string()))?;
+            f.write_all(&chunk)
+                .await
+                .map_err(|e| SegErr::Transient(e.to_string()))?;
         }
         cursor += chunk.len() as u64;
         wrote += chunk.len() as u64;
-        let total_now = downloaded_total.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
+        let total_now =
+            downloaded_total.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
         if last.elapsed() >= std::time::Duration::from_millis(250) {
             let _ = events.send(EngineEvent::Progress(layer_engine_api::Progress {
                 downloaded_bytes: total_now,

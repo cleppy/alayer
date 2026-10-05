@@ -1,5 +1,7 @@
 use crate::budget::ByteBudget;
-use crate::types::{EngineError, EngineEvent, FailureReason, HttpTaskSpec, Progress, TaskId, TaskKind, TaskState};
+use crate::types::{
+    EngineError, EngineEvent, FailureReason, HttpTaskSpec, Progress, TaskId, TaskKind, TaskState,
+};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -27,6 +29,11 @@ pub enum CoreEvent {
         old: TaskState,
         new: TaskState,
         failure: Option<FailureReason>,
+        file_name: String,
+    },
+    TorrentFiles {
+        task_id: TaskId,
+        files: Vec<crate::TorrentFile>,
     },
     Progress {
         task_id: TaskId,
@@ -72,6 +79,7 @@ pub struct MediaTaskSpec {
     pub task_id: TaskId,
     pub url: String,
     pub dest_dir: std::path::PathBuf,
+    pub speed_limit_bps: Option<u64>,
     /// yt-dlp `-f`. Yoksa en iyi birleşik dosya.
     pub format: Option<String>,
     /// `mp3` ise `--extract-audio`.
@@ -95,6 +103,9 @@ pub struct TorrentTaskSpec {
     /// `magnet:?...` veya `.torrent` dosyasının yolu.
     pub source: String,
     pub dest_dir: std::path::PathBuf,
+    pub speed_limit_bps: Option<u64>,
+    /// Daha önce seçilen aria2 dosya index'leri. Varsa seçim penceresi açılmaz.
+    pub selected_files: Option<Vec<u32>>,
 }
 
 /// BitTorrent motoru. aria2 bir implementasyondur; core onu tanımaz.
