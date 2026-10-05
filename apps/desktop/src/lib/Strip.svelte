@@ -20,7 +20,9 @@
     task.state === "completed" ? 1 : fraction(task.downloaded_bytes, task.total_bytes),
   );
   const count = $derived(cubeCount(task.total_bytes));
-  const filled = $derived(Math.round(ratio * count));
+  const filled = $derived(
+    task.total_bytes ? Math.round(ratio * count) : task.downloaded_bytes > 0 ? Math.max(1, count - 1) : 0,
+  );
   const left = $derived(
     task.total_bytes == null
       ? null
@@ -45,8 +47,14 @@
     <span class="tag">{kindLabel(task.kind)}</span>
   </div>
   <p class="stat">
-    {megabytes(left)} left / {megabytes(task.total_bytes)}
-    <span>{pct}</span>
+    {#if task.total_bytes}
+      {megabytes(left)} left / {megabytes(task.total_bytes)}
+      <span>{pct}</span>
+    {:else if task.downloaded_bytes > 0}
+      {megabytes(task.downloaded_bytes)} downloaded
+    {:else}
+      size unknown
+    {/if}
     {#if rate > 0}
       <span class="dim">{speed(rate)}</span>
     {/if}

@@ -57,6 +57,13 @@ impl Inner {
         if failure.is_some() {
             task.failure = failure;
         }
+        if let Ok(Some(fresh)) = self.db.load_task(&task.id) {
+            task.downloaded_bytes = task.downloaded_bytes.max(fresh.downloaded_bytes);
+            task.total_bytes = match (task.total_bytes, fresh.total_bytes) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (a, b) => a.or(b),
+            };
+        }
         if let Err(e) = self.db.upsert_task(task) {
             tracing::error!(task = %task.id, "durum yazılamadı: {e}");
             return;
@@ -299,11 +306,11 @@ async fn consume_engine_events(
                 }
             }
             EngineEvent::Progress(progress) => {
-                t.downloaded_bytes = progress.downloaded_bytes;
-                if progress.total_bytes.is_some() {
-                    t.total_bytes = progress.total_bytes;
-                }
-                if let Err(e) = inner.db.upsert_task(&t) {
+                if let Err(e) = inner.db.set_progress(
+                    &task_id,
+                    progress.downloaded_bytes,
+                    progress.total_bytes,
+                ) {
                     tracing::error!(task = %task_id, "ilerleme yazılamadı: {e}");
                 }
                 inner.emit(CoreEvent::Progress {
@@ -317,8 +324,8 @@ async fn consume_engine_events(
                     && file_name != "."
                     && file_name != ".."
                 {
-                    t.file_name = file_name;
-                    if let Err(e) = inner.db.upsert_task(&t) {
+                    t.file_name = file_name.clone();
+                    if let Err(e) = inner.db.set_file_name(&task_id, &file_name) {
                         tracing::error!(task = %task_id, "ad yazılamadı: {e}");
                     } else {
                         inner.emit(CoreEvent::TaskUpdated {
@@ -704,21 +711,61 @@ impl TaskManager {
     pub fn list(&self) -> Result<Vec<Task>, CoreError> {
         let mut tasks = self.inner.db.list_tasks()?;
         for task in &mut tasks {
-            if task.state != TaskState::Completed || task.downloaded_bytes > 0 {
-                continue;
-            }
-            let path = task.final_path();
-            if let Ok(meta) = std::fs::metadata(&path) {
-                let len = meta.len();
-                if len > 0 {
-                    task.downloaded_bytes = len;
-                    task.total_bytes = Some(len);
-                    let _ = self.inner.db.upsert_task(task);
+            let on_disk = bytes_on_disk(task);
+            if on_disk > task.downloaded_bytes {
+                task.downloaded_bytes = on_disk;
+                if task.state == TaskState::Completed {
+                    task.total_bytes = Some(on_disk);
                 }
+                let _ = self.inner.db.set_progress(&task.id, on_disk, task.total_bytes);
             }
         }
         Ok(tasks)
     }
+}
+
+fn bytes_on_disk(task: &Task) -> u64 {
+    let prefix: String = task.id.chars().take(8).collect();
+    let mut max = 0u64;
+    if let Ok(meta) = std::fs::metadata(task.final_path()) {
+        if meta.is_file() {
+            max = max.max(meta.len());
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(&task.dest_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let matches = name.starts_with(&prefix) || name.starts_with(&task.file_name);
+            if !matches || name.ends_with(".ytdl") || name.ends_with(".path") || name.ends_with(".aria2") {
+                continue;
+            }
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    max = max.max(meta.len());
+                } else if meta.is_dir() && name == task.file_name {
+                    max = max.max(dir_bytes(&entry.path()));
+                }
+            }
+        }
+    }
+    max
+}
+
+fn dir_bytes(path: &std::path::Path) -> u64 {
+    let mut sum = 0u64;
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        if let Ok(meta) = entry.metadata() {
+            if meta.is_file() {
+                sum += meta.len();
+            } else if meta.is_dir() {
+                sum += dir_bytes(&entry.path());
+            }
+        }
+    }
+    sum
 }
 
 #[cfg(test)]

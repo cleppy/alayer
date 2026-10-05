@@ -63,10 +63,13 @@
     tasks = next.map((task) => {
       const prev = tasks.find((item) => item.id === task.id);
       if (!prev) return task;
-      if (task.downloaded_bytes < prev.downloaded_bytes) {
+      if (
+        task.downloaded_bytes < prev.downloaded_bytes ||
+        (task.total_bytes == null && prev.total_bytes != null)
+      ) {
         return {
           ...task,
-          downloaded_bytes: prev.downloaded_bytes,
+          downloaded_bytes: Math.max(task.downloaded_bytes, prev.downloaded_bytes),
           total_bytes: task.total_bytes ?? prev.total_bytes,
         };
       }

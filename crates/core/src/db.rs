@@ -231,6 +231,36 @@ impl Db {
         Ok(out)
     }
 
+    /// Yalnız bayt alanları. Durum yazısı bunu ezemez.
+    pub fn set_progress(&self, id: &str, downloaded: u64, total: Option<u64>) -> Result<(), DbError> {
+        let conn = self.lock();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
+        if let Some(total) = total {
+            conn.execute(
+                "UPDATE tasks SET downloaded_bytes = MAX(downloaded_bytes, ?1), total_bytes = CASE WHEN total_bytes IS NULL OR total_bytes < ?2 THEN ?2 ELSE total_bytes END, updated_at = ?3 WHERE id = ?4",
+                params![to_i64(downloaded), to_i64(total), now, id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE tasks SET downloaded_bytes = MAX(downloaded_bytes, ?1), updated_at = ?2 WHERE id = ?3",
+                params![to_i64(downloaded), now, id],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn set_file_name(&self, id: &str, name: &str) -> Result<(), DbError> {
+        let conn = self.lock();
+        conn.execute(
+            "UPDATE tasks SET file_name = ?1 WHERE id = ?2",
+            params![name, id],
+        )?;
+        Ok(())
+    }
+
     /// Idempotent: olmayan id için Ok(0).
     pub fn delete_task(&self, id: &str) -> Result<(), DbError> {
         let conn = self.lock();
