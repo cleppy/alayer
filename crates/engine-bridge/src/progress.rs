@@ -2,7 +2,12 @@ use layer_engine_api::Progress;
 
 /// yt-dlp `--progress-template "download:%(progress.downloaded_bytes)s|..."`.
 pub fn parse_progress(line: &str) -> Option<Progress> {
-    let rest = line.trim().strip_prefix("download:")?;
+    let line = line.trim();
+    // `download:` şablon seçicisidir, çıktıda olmayabilir.
+    let rest = line.strip_prefix("download:").unwrap_or(line);
+    if !rest.chars().next()?.is_ascii_digit() {
+        return None;
+    }
     let mut parts = rest.split('|');
     let downloaded = parts.next()?.trim().parse::<u64>().ok()?;
     let total = parts
@@ -33,6 +38,15 @@ mod tests {
         assert_eq!(p.downloaded_bytes, 1200);
         assert_eq!(p.total_bytes, Some(8000));
         assert!((p.speed_bps - 400.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn parses_ytdlp_template_body() {
+        // `--progress-template download:...` satırında `download:` seçici olarak
+        // yenir; stdout'a yalnız gövde düşer. Bu satır gerçek çıktıdır.
+        let p = parse_progress("1024|5098855|394286.9").unwrap();
+        assert_eq!(p.downloaded_bytes, 1024);
+        assert_eq!(p.total_bytes, Some(5_098_855));
     }
 
     #[test]

@@ -9,6 +9,11 @@ description = "Linkten görev ekler."
 commands.allow = ["add_url"]
 
 [[permission]]
+identifier = "allow-add-torrent"
+description = "Torrent dosyası ekler."
+commands.allow = ["add_torrent"]
+
+[[permission]]
 identifier = "allow-pause"
 description = "Görevi duraklatır."
 commands.allow = ["pause"]

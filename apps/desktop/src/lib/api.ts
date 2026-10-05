@@ -38,6 +38,10 @@ export function addUrl(url: string): Promise<string> {
   return invoke("add_url", { url });
 }
 
+export function addTorrent(path: string): Promise<string> {
+  return invoke("add_torrent", { path });
+}
+
 export function pause(id: string): Promise<void> {
   return invoke("pause", { id });
 }

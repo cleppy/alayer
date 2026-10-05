@@ -6,8 +6,10 @@
   "permissions": [
     "core:default",
     "core:event:allow-listen",
+    "dialog:default",
     "allow-list-tasks",
     "allow-add-url",
+    "allow-add-torrent",
     "allow-pause",
     "allow-resume",
     "allow-cancel"

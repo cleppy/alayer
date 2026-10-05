@@ -31,6 +31,18 @@ export function stateLabel(state: string): string {
 }
 
 export function fraction(done: number, total: number | null): number {
-  if (!total || total <= 0) return done > 0 ? 0.08 : 0;
+  if (!total || total <= 0) return done > 0 ? 0.04 : 0;
   return Math.max(0, Math.min(1, done / total));
+}
+
+export function percent(done: number, total: number | null, state: string): string {
+  if (state === "completed") return "100%";
+  if (!total || total <= 0) return state === "downloading" ? "···" : "0%";
+  return `${Math.min(100, Math.round((done / total) * 100))}%`;
+}
+
+export function kindLabel(kind: string): string {
+  if (kind === "media") return "video";
+  if (kind === "torrent") return "torrent";
+  return "dosya";
 }

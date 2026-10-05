@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { TaskView } from "./api";
-  import { bytes, fraction, speed, stateLabel } from "./format";
+  import { bytes, fraction, kindLabel, percent, speed, stateLabel } from "./format";
 
   let {
     task,
@@ -16,48 +16,35 @@
     onCancel: (id: string) => void;
   } = $props();
 
-  const pct = $derived(fraction(task.downloaded_bytes, task.total_bytes));
-  const width = $derived(`${Math.round(pct * 1000) / 10}%`);
+  const width = $derived(`${Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 1000) / 10}%`);
   const active = $derived(task.state === "downloading" || task.state === "queued");
   const canResume = $derived(
     task.state === "paused" || task.state === "failed" || task.state === "conflict",
   );
-  const resumeLabel = $derived(task.state === "failed" ? "Yeniden dene" : "Sürdür");
+  const resumeLabel = $derived(task.state === "failed" || task.state === "conflict" ? "Yeniden dene" : "Sürdür");
+  const waiting = $derived(task.state === "downloading" && task.downloaded_bytes === 0);
 </script>
 
-<article class="strip" style="--fill: {width}" aria-label="{task.file_name}, {stateLabel(task.state)}">
-  <div class="sprocket" aria-hidden="true"></div>
-  <div class="frame">
-    <div class="exposure"></div>
-    <div class="copy light">
-      <p class="name">{task.file_name}</p>
-      <p class="meta">
-        {stateLabel(task.state)}
-        · {bytes(task.downloaded_bytes)} / {bytes(task.total_bytes)}
-        {#if task.state === "downloading" && rate > 0}
-          · {speed(rate)}
-        {/if}
-        {#if task.unresumable && active}
-          · durunca baştan
-        {/if}
-      </p>
-      {#if task.failure}
-        <p class="fail">{task.failure}</p>
-      {/if}
+<article class="row" class:done={task.state === "completed"} class:bad={task.state === "failed" || task.state === "conflict"} data-kind={task.kind}>
+  <p class="pct" aria-hidden="true">{percent(task.downloaded_bytes, task.total_bytes, task.state)}</p>
+  <div class="body">
+    <div class="topline">
+      <h2>{task.file_name}</h2>
+      <span class="chip">{kindLabel(task.kind)}</span>
+      <span class="state">{waiting ? "çözülüyor" : stateLabel(task.state)}</span>
     </div>
-    <div class="copy dark" aria-hidden="true">
-      <p class="name">{task.file_name}</p>
-      <p class="meta">
-        {stateLabel(task.state)}
-        · {bytes(task.downloaded_bytes)} / {bytes(task.total_bytes)}
-        {#if task.state === "downloading" && rate > 0}
-          · {speed(rate)}
-        {/if}
-      </p>
-      {#if task.failure}
-        <p class="fail">{task.failure}</p>
-      {/if}
+    <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 100)} aria-label={task.file_name}>
+      <span style="width: {width}"></span>
     </div>
+    <p class="meta">
+      {bytes(task.downloaded_bytes)} / {bytes(task.total_bytes)}
+      {#if task.state === "downloading" && rate > 0}
+        · {speed(rate)}
+      {/if}
+      {#if task.failure}
+        · {task.failure}
+      {/if}
+    </p>
   </div>
   <div class="actions">
     {#if active}

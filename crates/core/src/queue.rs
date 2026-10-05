@@ -25,6 +25,21 @@ impl QueuePolicy {
         }
     }
 
+    /// Aynı anda tek torrent. HTTP limiti bunu saymaz.
+    pub fn next_torrent(&self, tasks: &[Task]) -> Option<TaskId> {
+        if tasks
+            .iter()
+            .any(|t| t.kind == TaskKind::Torrent && t.is_active())
+        {
+            return None;
+        }
+        tasks
+            .iter()
+            .filter(|t| t.kind == TaskKind::Torrent && t.state == TaskState::Queued)
+            .min_by_key(|t| (t.created_at, &t.id))
+            .map(|t| t.id.clone())
+    }
+
     /// Aynı anda tek medya çözümü. HTTP limiti bunu saymaz.
     pub fn next_media(&self, tasks: &[Task]) -> Option<TaskId> {
         if tasks.iter().any(|t| t.kind == TaskKind::Media && t.is_active()) {

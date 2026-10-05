@@ -31,6 +31,7 @@ struct Inner {
     /// Görev limiti `spec.speed_limit_bps`'tedir; ikisi de varsa yavaş olan kazanır.
     global_limit: Mutex<Option<Arc<ByteBudget>>>,
     media: Mutex<Option<Arc<dyn layer_engine_api::MediaResolver>>>,
+    torrent: Mutex<Option<Arc<dyn layer_engine_api::TorrentEngine>>>,
     shutdown: CancellationToken,
     pump: Mutex<Option<tokio::task::AbortHandle>>,
     dispatched: AtomicUsize,
@@ -184,6 +185,47 @@ impl Inner {
         Ok(())
     }
 
+    async fn dispatch_torrent(self: &Arc<Self>, id: TaskId) -> Result<(), CoreError> {
+        let engine = self
+            .torrent
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let Some(engine) = engine else {
+            return Ok(());
+        };
+        let mut t = self
+            .db
+            .load_task(&id)?
+            .ok_or_else(|| CoreError::NotFound(id.clone()))?;
+        if t.kind != TaskKind::Torrent || self.lock_running().contains_key(&id) {
+            return Ok(());
+        }
+        self.set_state(&mut t, TaskState::Downloading, None);
+        if t.state != TaskState::Downloading {
+            return Ok(());
+        }
+        let spec = layer_engine_api::TorrentTaskSpec {
+            task_id: t.id.clone(),
+            source: t.url.clone(),
+            dest_dir: t.dest_dir.clone(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let cancel = CancellationToken::new();
+        self.lock_running().insert(id.clone(), cancel.clone());
+        self.dispatched.fetch_add(1, Ordering::SeqCst);
+        let run_id = id.clone();
+        tokio::spawn(async move {
+            if let Err(e) = engine.run(spec, tx.clone(), cancel).await {
+                tracing::error!(task = %run_id, "torrent hatası: {e}");
+                let _ = tx.send(EngineEvent::Failed(FailureReason::Torrent(e.to_string())));
+            }
+        });
+        let inner = Arc::clone(self);
+        tokio::spawn(consume_engine_events(inner, id, rx));
+        Ok(())
+    }
+
     /// Engine run bittiğinde: görev hâlâ Downloading ise motor terminal event
     /// vermeden çıkmış demektir → Failed. Sonra slot boşaltılır ve pump uyandırılır.
     async fn on_run_finished(self: &Arc<Self>, id: TaskId) {
@@ -255,6 +297,13 @@ async fn consume_engine_events(
                 }
             }
             EngineEvent::Progress(progress) => {
+                t.downloaded_bytes = progress.downloaded_bytes;
+                if progress.total_bytes.is_some() {
+                    t.total_bytes = progress.total_bytes;
+                }
+                if let Err(e) = inner.db.upsert_task(&t) {
+                    tracing::error!(task = %task_id, "ilerleme yazılamadı: {e}");
+                }
                 inner.emit(CoreEvent::Progress {
                     task_id: task_id.clone(),
                     progress,
@@ -339,6 +388,19 @@ async fn pump_loop(inner: Arc<Inner>) {
                     if let Err(e) = inner.dispatch_media(id).await {
                         tracing::error!("pump: media dispatch hatası: {e}");
                     }
+                    continue;
+                }
+            }
+            let has_torrent = inner
+                .torrent
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_some();
+            if has_torrent {
+                if let Some(id) = inner.policy.next_torrent(&tasks) {
+                    if let Err(e) = inner.dispatch_torrent(id).await {
+                        tracing::error!("pump: torrent dispatch hatası: {e}");
+                    }
                 }
             }
             break;
@@ -371,11 +433,17 @@ impl TaskManager {
                 notify: Arc::new(Notify::new()),
                 global_limit: Mutex::new(None),
                 media: Mutex::new(None),
+                torrent: Mutex::new(None),
                 shutdown: CancellationToken::new(),
                 pump: Mutex::new(None),
                 dispatched: AtomicUsize::new(0),
             }),
         }
+    }
+
+    /// Magnet ve `.torrent` bu motora gider. Yoksa torrent kuyrukta bekler.
+    pub fn set_torrent_engine(&self, engine: Arc<dyn layer_engine_api::TorrentEngine>) {
+        *self.inner.torrent.lock().unwrap_or_else(|e| e.into_inner()) = Some(engine);
     }
 
     /// Sayfa linkleri (YouTube vb.) bu çözücüye gider. Yoksa Media kuyrukta bekler.
@@ -430,6 +498,40 @@ impl TaskManager {
             task_id: task.id.clone(),
             kind,
             source,
+        });
+        self.inner.notify.notify_one();
+        Ok(task.id)
+    }
+
+    /// `.torrent` dosyasından görev. Kaynak alanına dosya yolu yazılır.
+    pub async fn intake_torrent_file(
+        &self,
+        path: PathBuf,
+        dest_dir: PathBuf,
+    ) -> Result<TaskId, CoreError> {
+        if !path.is_file() {
+            return Err(CoreError::InvalidState(format!(
+                "torrent dosyası yok: {}",
+                path.display()
+            )));
+        }
+        let mut task = Task::new_torrent(path.display().to_string(), dest_dir);
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            if !stem.is_empty() {
+                task.file_name = stem
+                    .chars()
+                    .map(|c| match c {
+                        '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+                        c => c,
+                    })
+                    .collect();
+            }
+        }
+        self.inner.db.upsert_task(&task)?;
+        self.inner.emit(CoreEvent::TaskAdded {
+            task_id: task.id.clone(),
+            kind: TaskKind::Torrent,
+            source: IntakeSource::Ui,
         });
         self.inner.notify.notify_one();
         Ok(task.id)

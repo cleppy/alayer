@@ -34,6 +34,19 @@ pub async fn add_url(
 }
 
 #[tauri::command]
+pub async fn add_torrent(
+    app: AppHandle,
+    state: State<'_, TaskManager>,
+    path: String,
+) -> Result<String, String> {
+    let dir = downloads(&app)?;
+    state
+        .intake_torrent_file(std::path::PathBuf::from(path), dir)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn pause(state: State<'_, TaskManager>, id: String) -> Result<(), String> {
     state.pause(&id).await.map_err(|e| e.to_string())
 }

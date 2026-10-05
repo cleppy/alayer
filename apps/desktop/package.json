@@ -11,7 +11,8 @@
     "@fontsource/ibm-plex-mono": "^5.2.5",
     "@fontsource/source-sans-3": "^5.2.5",
     "@fontsource/syne": "^5.2.5",
-    "@tauri-apps/api": "^2.7.0"
+    "@tauri-apps/api": "^2.7.0",
+    "@tauri-apps/plugin-dialog": "^2.4.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.1.0",

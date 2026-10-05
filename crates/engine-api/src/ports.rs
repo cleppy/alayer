@@ -85,6 +85,25 @@ pub trait MediaResolver: Send + Sync {
     ) -> Result<(), EngineError>;
 }
 
+#[derive(Debug, Clone)]
+pub struct TorrentTaskSpec {
+    pub task_id: TaskId,
+    /// `magnet:?...` veya `.torrent` dosyasının yolu.
+    pub source: String,
+    pub dest_dir: std::path::PathBuf,
+}
+
+/// BitTorrent motoru. aria2 bir implementasyondur; core onu tanımaz.
+#[async_trait::async_trait]
+pub trait TorrentEngine: Send + Sync {
+    async fn run(
+        &self,
+        spec: TorrentTaskSpec,
+        events: mpsc::UnboundedSender<EngineEvent>,
+        cancel: CancellationToken,
+    ) -> Result<(), EngineError>;
+}
+
 #[async_trait::async_trait]
 pub trait HttpEngine: Send + Sync {
     async fn run(

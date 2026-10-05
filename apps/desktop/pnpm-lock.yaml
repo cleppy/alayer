@@ -20,6 +20,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.7.0
         version: 2.12.1
+      '@tauri-apps/plugin-dialog':
+        specifier: ^2.4.0
+        version: 2.8.1
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5.1.0
@@ -464,6 +467,9 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
+  '@tauri-apps/plugin-dialog@2.8.1':
+    resolution: {integrity: sha512-/DtE3B62JgpYuWFL5ATXM6KOXUq7pca7cJWOgSqULhZsgyjLk0PWKek1dbRDvhNBW6flNsOfWphsKnb+738Dmw==}
+
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -892,6 +898,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.12.1
       '@tauri-apps/cli-win32-ia32-msvc': 2.12.1
       '@tauri-apps/cli-win32-x64-msvc': 2.12.1
+
+  '@tauri-apps/plugin-dialog@2.8.1':
+    dependencies:
+      '@tauri-apps/api': 2.12.1
 
   '@types/estree@1.0.9': {}
 

@@ -3,7 +3,7 @@ mod sink;
 mod view;
 
 use layer_core::{Db, QueuePolicy, TaskManager};
-use layer_engine_bridge::YtdlpResolver;
+use layer_engine_bridge::{Aria2Engine, YtdlpResolver};
 use layer_engine_http::ReqwestHttpEngine;
 use sink::TauriSink;
 use std::path::PathBuf;
@@ -12,6 +12,7 @@ use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -29,6 +30,12 @@ pub fn run() {
                 sink,
                 QueuePolicy::default(),
             );
+            if let Some(aria) = find_sidecar("aria2c.exe") {
+                let work = data.join("aria2");
+                manager.set_torrent_engine(Arc::new(Aria2Engine::new(aria, work)));
+            } else {
+                eprintln!("aria2c yok: magnet ve torrent kuyrukta bekler");
+            }
             if let Some(ytdlp) = find_sidecar("yt-dlp.exe") {
                 let ffmpeg = find_sidecar("ffmpeg.exe");
                 let node = find_node();
@@ -48,6 +55,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_tasks,
             commands::add_url,
+            commands::add_torrent,
             commands::pause,
             commands::resume,
             commands::cancel
