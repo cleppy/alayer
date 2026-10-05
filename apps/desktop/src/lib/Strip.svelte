@@ -1,67 +1,71 @@
 <script lang="ts">
   import type { TaskView } from "./api";
-  import { bytes, fraction, kindLabel, speed, stateLabel } from "./format";
+  import { cubeCount, fraction, kindLabel, megabytes, speed, stateLabel } from "./format";
 
   let {
     task,
     rate = 0,
-    selected = false,
-    onOpen,
     onPause,
     onResume,
     onCancel,
   }: {
     task: TaskView;
     rate?: number;
-    selected?: boolean;
-    onOpen: (id: string) => void;
     onPause: (id: string) => void;
     onResume: (id: string) => void;
     onCancel: (id: string) => void;
   } = $props();
 
-  const width = $derived(
+  const ratio = $derived(
+    task.state === "completed" ? 1 : fraction(task.downloaded_bytes, task.total_bytes),
+  );
+  const count = $derived(cubeCount(task.total_bytes));
+  const filled = $derived(Math.round(ratio * count));
+  const left = $derived(
+    task.total_bytes == null
+      ? null
+      : Math.max(0, task.total_bytes - task.downloaded_bytes),
+  );
+  const pct = $derived(
     task.state === "completed"
       ? "100%"
-      : `${Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 1000) / 10}%`,
+      : task.total_bytes
+        ? `${Math.min(100, Math.round(ratio * 100))}%`
+        : "—",
   );
   const active = $derived(task.state === "downloading" || task.state === "queued");
   const canResume = $derived(
     task.state === "paused" || task.state === "failed" || task.state === "conflict",
   );
-  const label = $derived(
-    task.state === "completed"
-      ? `Bitti · ${bytes(task.downloaded_bytes)}`
-      : task.state === "downloading"
-        ? rate > 0
-          ? `${stateLabel(task.state)} · ${speed(rate)}`
-          : "İniyor"
-        : stateLabel(task.state),
-  );
 </script>
 
-<article class="card" class:on={selected}>
-  <button type="button" class="card-hit" onclick={() => onOpen(task.id)}>
+<article class="card">
+  <div class="card-top">
     <h2>{task.file_name}</h2>
-    <div class="tags">
-      <span class="tag">{kindLabel(task.kind)}</span>
-      <span class="tag">{stateLabel(task.state)}</span>
-    </div>
-    <p class="meta">{bytes(task.downloaded_bytes)} / {bytes(task.total_bytes)}</p>
-  </button>
-  <div class="dl" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={task.state === "completed" ? 100 : Math.round(fraction(task.downloaded_bytes, task.total_bytes) * 100)}>
-    <span class="dl-fill" style:width={width}></span>
-    <span class="dl-label">{label}</span>
+    <span class="tag">{kindLabel(task.kind)}</span>
   </div>
+  <p class="stat">
+    {megabytes(left)} left / {megabytes(task.total_bytes)}
+    <span>{pct}</span>
+    {#if rate > 0}
+      <span class="dim">{speed(rate)}</span>
+    {/if}
+  </p>
+  <div class="cubes" aria-hidden="true">
+    {#each Array(count) as _, i (i)}
+      <span class="cube" class:on={i < filled} class:now={active && i === filled}></span>
+    {/each}
+  </div>
+  <p class="meta">{stateLabel(task.state)}{#if task.failure} · {task.failure}{/if}</p>
   <div class="row-actions">
     {#if active}
-      <button type="button" onclick={() => onPause(task.id)}>Duraklat</button>
+      <button type="button" onclick={() => onPause(task.id)}>Pause</button>
     {/if}
     {#if canResume}
-      <button type="button" onclick={() => onResume(task.id)}>Sürdür</button>
+      <button type="button" onclick={() => onResume(task.id)}>Resume</button>
     {/if}
     <button type="button" onclick={() => onCancel(task.id)}>
-      {task.state === "completed" ? "Kaldır" : "İptal"}
+      {task.state === "completed" ? "Remove" : "Cancel"}
     </button>
   </div>
 </article>

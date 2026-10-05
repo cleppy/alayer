@@ -59,7 +59,7 @@ mod tests {
         assert_eq!(view.kind, "http");
         assert_eq!(view.state, "failed");
         assert_eq!(view.file_name, "a.bin");
-        assert_eq!(view.failure.as_deref(), Some("ağ hatası: reset"));
+        assert_eq!(view.failure.as_deref(), Some("network error: reset"));
         assert!(view.unresumable);
         assert_eq!(view.downloaded_bytes, 12);
     }

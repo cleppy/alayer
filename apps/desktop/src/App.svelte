@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open } from "@tauri-apps/plugin-dialog";
-  import Detail from "./lib/Detail.svelte";
   import Strip from "./lib/Strip.svelte";
   import {
     addMedia,
@@ -33,11 +32,12 @@
 
   const videos = $derived(choices.filter((c) => c.group === "video"));
   const audios = $derived(choices.filter((c) => c.group === "audio"));
-  let version = $state<"split" | "plain">(
-    localStorage.getItem("layer-ui") === "plain" ? "plain" : "split",
-  );
   let filter = $state("all");
-  let selectedId = $state("");
+  let settingsOpen = $state(false);
+  let shape = $state<"sharp" | "soft">(
+    localStorage.getItem("layer-shape") === "soft" ? "soft" : "sharp",
+  );
+  let accent = $state(localStorage.getItem("layer-accent") || "blue");
 
   const shown = $derived(
     tasks.filter((task) => {
@@ -47,11 +47,15 @@
       return true;
     }),
   );
-  const selected = $derived(shown.find((task) => task.id === selectedId) ?? shown[0]);
 
-  function setVersion(next: "split" | "plain") {
-    version = next;
-    localStorage.setItem("layer-ui", next);
+  function setShape(next: "sharp" | "soft") {
+    shape = next;
+    localStorage.setItem("layer-shape", next);
+  }
+
+  function setAccent(next: string) {
+    accent = next;
+    localStorage.setItem("layer-accent", next);
   }
 
   async function refresh() {
@@ -100,7 +104,7 @@
       if (path.toLowerCase().endsWith(".torrent")) {
         await addTorrent(path);
       } else {
-        error = "Bırakılan dosya .torrent değil.";
+        error = "Dropped file is not a .torrent.";
         return;
       }
       await refresh();
@@ -210,45 +214,59 @@
   }
 </script>
 
-<main class="shell" class:dragging>
+<main class="shell" class:dragging data-shape={shape} data-accent={accent}>
   <header class="top">
     <p class="mark">layer</p>
-    <div class="versions" aria-label="Görünüm">
-      <button type="button" class:on={version === "split"} onclick={() => setVersion("split")}>1 Bölünmüş</button>
-      <button type="button" class:on={version === "plain"} onclick={() => setVersion("plain")}>2 Sade</button>
+    <div class="settings">
+      <button type="button" class="gear" aria-expanded={settingsOpen} onclick={() => (settingsOpen = !settingsOpen)}>Settings</button>
+      {#if settingsOpen}
+        <div class="panel">
+          <p>Theme</p>
+          <div class="shapes">
+            <button type="button" class="shape" class:on={shape === "sharp"} onclick={() => setShape("sharp")}>Sharp</button>
+            <button type="button" class="shape" class:on={shape === "soft"} onclick={() => setShape("soft")}>Soft</button>
+          </div>
+          <p>Color</p>
+          <div class="swatches">
+            {#each ["blue", "red", "purple", "green", "white"] as color (color)}
+              <button type="button" class="swatch" data-color={color} class:on={accent === color} onclick={() => setAccent(color)}>{color}</button>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
   </header>
   <form class="composer" onsubmit={submit}>
-    <label class="sr" for="url">İndirme linki veya magnet</label>
+    <label class="sr" for="url">Download link or magnet</label>
     <input
       id="url"
       bind:value={url}
-      placeholder="https://…  veya  magnet:?xt=…"
+      placeholder="https://…  or  magnet:?xt=…"
       autocomplete="off"
       spellcheck="false"
       disabled={!inApp || busy}
     />
-    <button class="go" type="submit" disabled={!inApp || busy || url.trim() === ""}>İndir</button>
+    <button class="go" type="submit" disabled={!inApp || busy || url.trim() === ""}>Download</button>
     <button class="file" type="button" onclick={pickTorrent} disabled={!inApp}>Torrent</button>
   </form>
-  <div class="filters" aria-label="Süzgeç">
-    <button type="button" class:on={filter === "all"} onclick={() => (filter = "all")}>Tümü</button>
+  <div class="filters" aria-label="Filter">
+    <button type="button" class:on={filter === "all"} onclick={() => (filter = "all")}>All</button>
     <button type="button" class:on={filter === "video"} onclick={() => (filter = "video")}>Video</button>
     <button type="button" class:on={filter === "torrent"} onclick={() => (filter = "torrent")}>Torrent</button>
-    <button type="button" class:on={filter === "file"} onclick={() => (filter = "file")}>Dosya</button>
+    <button type="button" class:on={filter === "file"} onclick={() => (filter = "file")}>File</button>
   </div>
 
   {#if looking}
-    <p class="empty">Formatlar bakılıyor…</p>
+    <p class="empty">Checking formats…</p>
   {/if}
   {#if choices.length > 0}
-    <section class="deck" aria-label="Kalite">
+    <section class="deck" aria-label="Quality">
       <div class="deck-head">
         <h2>{menuTitle}</h2>
-        <button type="button" class="quiet" onclick={dismissMenu}>Vazgeç</button>
+        <button type="button" class="quiet" onclick={dismissMenu}>Cancel</button>
       </div>
       {#if videos.length > 0}
-        <p class="deck-label">Görüntü · mp4</p>
+        <p class="deck-label">Video · mp4</p>
         <div class="keys">
           {#each videos as choice (choice.id)}
             <button type="button" class="key" onclick={() => pick(choice)}>{choice.label}</button>
@@ -256,7 +274,7 @@
         </div>
       {/if}
       {#if audios.length > 0}
-        <p class="deck-label">Ses</p>
+        <p class="deck-label">Audio</p>
         <div class="keys">
           {#each audios as choice (choice.id)}
             <button type="button" class="key audio" onclick={() => pick(choice)}>{choice.label}</button>
@@ -270,37 +288,24 @@
     <p class="banner" role="alert">{error}</p>
   {/if}
   {#if !inApp}
-    <p class="banner">Bu ekran uygulama penceresinde açılır.</p>
+    <p class="banner">Open this screen in the app window.</p>
   {:else if tasks.length === 0}
-    <p class="empty">Kuyruk boş. Link yapıştır, magnet yapıştır, ya da bir .torrent bırak.</p>
+    <p class="empty">Queue is empty. Paste a link, a magnet, or drop a .torrent file.</p>
   {/if}
 
-  <div class="layout" class:plain={version === "plain"}>
-    <section class="list" aria-label="İndirme kuyruğu">
-      {#each shown as task (task.id)}
-        <Strip
-          {task}
-          rate={rates[task.id] ?? 0}
-          selected={selected?.id === task.id}
-          onOpen={(id) => (selectedId = id)}
-          onPause={(id) => run(pause, id)}
-          onResume={(id) => run(resume, id)}
-          onCancel={(id) => run(cancel, id)}
-        />
-      {/each}
-    </section>
-    {#if version === "split" && selected}
-      <Detail
-        task={selected}
-        rate={rates[selected.id] ?? 0}
+  <section class="list" aria-label="Download queue">
+    {#each shown as task (task.id)}
+      <Strip
+        {task}
+        rate={rates[task.id] ?? 0}
         onPause={(id) => run(pause, id)}
         onResume={(id) => run(resume, id)}
         onCancel={(id) => run(cancel, id)}
       />
-    {/if}
-  </div>
+    {/each}
+  </section>
 
   {#if dragging}
-    <div class="drop">Torrent dosyasını bırak</div>
+    <div class="drop">Drop the torrent file</div>
   {/if}
 </main>

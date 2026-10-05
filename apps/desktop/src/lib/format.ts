@@ -18,12 +18,12 @@ export function speed(bps: number): string {
 }
 
 const STATE: Record<string, string> = {
-  queued: "sırada",
-  downloading: "iniyor",
-  paused: "durdu",
-  completed: "bitti",
-  failed: "hata",
-  conflict: "çakıştı",
+  queued: "queued",
+  downloading: "downloading",
+  paused: "paused",
+  completed: "done",
+  failed: "failed",
+  conflict: "conflict",
 };
 
 export function stateLabel(state: string): string {
@@ -44,5 +44,18 @@ export function percent(done: number, total: number | null, state: string): stri
 export function kindLabel(kind: string): string {
   if (kind === "media") return "video";
   if (kind === "torrent") return "torrent";
-  return "dosya";
+  return "file";
+}
+
+export function megabytes(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  const mb = n / (1024 * 1024);
+  return `${mb >= 100 ? mb.toFixed(0) : mb.toFixed(1)} MB`;
+}
+
+export function cubeCount(total: number | null): number {
+  if (!total || total <= 0) return 8;
+  const mb = total / (1024 * 1024);
+  const n = Math.round(4 + Math.log2(mb + 1) * 5);
+  return Math.max(4, Math.min(48, n));
 }

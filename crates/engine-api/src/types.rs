@@ -34,14 +34,14 @@ impl FailureReason {
     /// Kullanıcıya gösterilecek tek satırlık mesaj.
     pub fn display(&self) -> String {
         match self {
-            FailureReason::Network(m) => format!("ağ hatası: {m}"),
+            FailureReason::Network(m) => format!("network error: {m}"),
             FailureReason::Http { status, message } => format!("HTTP {status}: {message}"),
             FailureReason::ResolverRequired => {
-                "link yenilenmesi gerekiyor ama çözücü yok".to_string()
+                "link expired and there is no resolver".to_string()
             }
-            FailureReason::Resolver(m) => format!("çözücü hatası: {m}"),
-            FailureReason::Io(m) => format!("disk hatası: {m}"),
-            FailureReason::Torrent(m) => format!("torrent hatası: {m}"),
+            FailureReason::Resolver(m) => format!("resolver error: {m}"),
+            FailureReason::Io(m) => format!("disk error: {m}"),
+            FailureReason::Torrent(m) => format!("torrent error: {m}"),
         }
     }
 }
