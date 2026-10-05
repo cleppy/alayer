@@ -34,9 +34,7 @@
   const audios = $derived(choices.filter((c) => c.group === "audio"));
   let filter = $state("all");
   let settingsOpen = $state(false);
-  let shape = $state<"sharp" | "soft">(
-    localStorage.getItem("layer-shape") === "soft" ? "soft" : "sharp",
-  );
+  let shape = $state<"sharp" | "soft">("sharp");
   let accent = $state(localStorage.getItem("layer-accent") || "blue");
 
   const shown = $derived(
@@ -117,6 +115,7 @@
   }
 
   onMount(() => {
+    localStorage.setItem("layer-shape", "sharp");
     if (!inApp) return;
     refresh().catch((err) => {
       error = String(err);
